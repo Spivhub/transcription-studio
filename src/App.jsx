@@ -250,6 +250,16 @@ const STYLES = `
     gap: 8px;
     flex-wrap: wrap;
     margin-bottom: 24px;
+    position: sticky;
+    top: 0;
+    z-index: 50;
+    background: var(--bg);
+    padding: 12px 0;
+    border-bottom: 1px solid var(--border-subtle);
+    margin-left: -4px;
+    margin-right: -4px;
+    padding-left: 4px;
+    padding-right: 4px;
   }
 
   .toolbar-bottom {
