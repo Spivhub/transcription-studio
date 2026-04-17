@@ -21,20 +21,12 @@ exports.handler = async function (event) {
   const { action, payload } = JSON.parse(event.body || "{}");
 
   try {
-    if (action === "upload") {
-      const { fileData, contentType } = payload;
-      const binary = Buffer.from(fileData, "base64");
-      const res = await fetch("https://api.assemblyai.com/v2/upload", {
-        method: "POST",
-        headers: {
-          authorization: API_KEY,
-          "content-type": contentType || "application/octet-stream",
-        },
-        body: binary,
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Upload failed");
-      return { statusCode: 200, headers, body: JSON.stringify(data) };
+    if (action === "getKey") {
+      return {
+        statusCode: 200,
+        headers,
+        body: JSON.stringify({ key: API_KEY }),
+      };
     }
 
     if (action === "request") {
