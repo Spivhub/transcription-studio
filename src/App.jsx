@@ -138,7 +138,6 @@ const STYLES = `
   }
 
   .file-icon { font-size: 22px; opacity: 0.6; }
-
   .file-info { flex: 1; min-width: 0; }
 
   .file-name {
@@ -514,24 +513,27 @@ export default function App() {
     setWords([]);
     setStatus("uploading");
     setProgress(10);
-    setProgressLabel("Reading file...");
+    setProgressLabel("Getting upload token...");
 
     try {
-      // Convert file to base64
-      const fileData = await new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = () => resolve(reader.result.split(",")[1]);
-        reader.onerror = reject;
-        reader.readAsDataURL(file);
+      // Get API key from server - audio never passes through Netlify
+      const tokenRes = await fetch(API, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ action: "getKey", payload: {} }),
       });
+      const { key } = await tokenRes.json();
 
-      setProgressLabel("Uploading audio...");
       setProgress(20);
+      setProgressLabel("Uploading audio...");
 
-      const { upload_url } = await call("upload", {
-        fileData,
-        contentType: file.type || "application/octet-stream",
+      // Upload directly from browser to AssemblyAI - no size limit
+      const uploadRes = await fetch("https://api.assemblyai.com/v2/upload", {
+        method: "POST",
+        headers: { authorization: key },
+        body: file,
       });
+      const { upload_url } = await uploadRes.json();
 
       setProgress(35);
       setProgressLabel("Queuing transcription...");
