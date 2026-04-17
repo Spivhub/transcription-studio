@@ -41,7 +41,7 @@ exports.handler = async function (event) {
           audio_url: upload_url,
           punctuate: true,
           format_text: true,
-          speech_model: "universal-2",
+          speech_models: ["universal-2"],
         }),
       });
       const data = await res.json();
