@@ -64,10 +64,7 @@ const STYLES = `
     margin-bottom: 10px;
   }
 
-  .header-title em {
-    font-style: italic;
-    color: var(--accent);
-  }
+  .header-title em { font-style: italic; color: var(--accent); }
 
   .header-sub {
     font-size: 14px;
@@ -95,12 +92,7 @@ const STYLES = `
     background: #181816;
   }
 
-  .drop-icon {
-    font-size: 28px;
-    margin-bottom: 16px;
-    opacity: 0.6;
-    display: block;
-  }
+  .drop-icon { font-size: 28px; margin-bottom: 16px; opacity: 0.6; display: block; }
 
   .drop-title {
     font-size: 17px;
@@ -110,12 +102,7 @@ const STYLES = `
     letter-spacing: -0.01em;
   }
 
-  .drop-sub {
-    font-size: 13px;
-    color: var(--text-muted);
-    font-style: italic;
-    line-height: 1.6;
-  }
+  .drop-sub { font-size: 13px; color: var(--text-muted); font-style: italic; line-height: 1.6; }
 
   .drop-formats {
     margin-top: 18px;
@@ -150,11 +137,7 @@ const STYLES = `
     margin-bottom: 3px;
   }
 
-  .file-size {
-    font-size: 12px;
-    color: var(--text-muted);
-    font-style: italic;
-  }
+  .file-size { font-size: 12px; color: var(--text-muted); font-style: italic; }
 
   .file-clear {
     background: none;
@@ -220,21 +203,19 @@ const STYLES = `
     transition: width 0.4s ease;
   }
 
-  .progress-status {
-    font-size: 13px;
-    color: var(--text-secondary);
-    font-style: italic;
-  }
+  .progress-status { font-size: 13px; color: var(--text-secondary); font-style: italic; }
 
   .transcript-section { margin-bottom: 80px; }
 
   .transcript-header {
     display: flex;
-    align-items: baseline;
+    align-items: center;
     justify-content: space-between;
-    margin-bottom: 28px;
+    margin-bottom: 20px;
     padding-bottom: 16px;
     border-bottom: 1px solid var(--border-subtle);
+    flex-wrap: wrap;
+    gap: 12px;
   }
 
   .transcript-title {
@@ -243,15 +224,6 @@ const STYLES = `
     letter-spacing: 0.25em;
     color: var(--text-muted);
     text-transform: uppercase;
-  }
-
-  .transcript-meta {
-    font-size: 12px;
-    color: var(--text-muted);
-    font-style: italic;
-    display: flex;
-    gap: 20px;
-    align-items: center;
   }
 
   .legend-item {
@@ -270,6 +242,123 @@ const STYLES = `
     border: 1px solid var(--low-confidence-border);
     border-radius: 2px;
     display: inline-block;
+  }
+
+  .toolbar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin-bottom: 24px;
+  }
+
+  .toolbar-bottom {
+    margin-top: 28px;
+    margin-bottom: 0;
+    padding-top: 20px;
+    border-top: 1px solid var(--border-subtle);
+  }
+
+  .tool-btn {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    background: none;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 8px 14px;
+    font-family: var(--font-serif-sc);
+    font-size: 9px;
+    letter-spacing: 0.18em;
+    color: var(--text-secondary);
+    cursor: pointer;
+    text-transform: uppercase;
+    transition: all 0.2s;
+    white-space: nowrap;
+  }
+
+  .tool-btn:hover { border-color: var(--accent-dim); color: var(--accent); }
+  .tool-btn.active { border-color: var(--accent-dim); color: var(--accent); background: #1e1c18; }
+
+  .tool-btn.commit-btn { border-color: #5a8a5a; color: #90c090; }
+  .tool-btn.commit-btn:hover { border-color: #80b080; color: #b0d8b0; background: #161e16; }
+
+  .tool-icon { font-size: 13px; }
+
+  .share-wrapper { position: relative; }
+
+  .share-menu {
+    position: absolute;
+    top: calc(100% + 6px);
+    left: 0;
+    background: #1e1d1a;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 6px;
+    z-index: 100;
+    min-width: 190px;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+  }
+
+  .share-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+    background: none;
+    border: none;
+    border-radius: 3px;
+    padding: 9px 12px;
+    font-family: var(--font-serif-sc);
+    font-size: 9px;
+    letter-spacing: 0.18em;
+    color: var(--text-secondary);
+    cursor: pointer;
+    text-transform: uppercase;
+    text-align: left;
+    transition: all 0.15s;
+    white-space: nowrap;
+  }
+
+  .share-item:hover { background: #2a2826; color: var(--accent); }
+  .share-icon { font-size: 13px; width: 18px; text-align: center; }
+
+  .sms-warning {
+    background: #1e1a14;
+    border: 1px solid #5a4a20;
+    border-radius: 4px;
+    padding: 10px 14px;
+    font-size: 12px;
+    color: #c4a050;
+    font-style: italic;
+    margin-bottom: 16px;
+    line-height: 1.5;
+  }
+
+  .stats-row {
+    display: flex;
+    gap: 32px;
+    margin-bottom: 32px;
+    padding: 20px 0;
+    border-top: 1px solid var(--border-subtle);
+    border-bottom: 1px solid var(--border-subtle);
+  }
+
+  .stat { display: flex; flex-direction: column; gap: 4px; }
+
+  .stat-value {
+    font-size: 22px;
+    font-weight: 500;
+    color: var(--text-primary);
+    letter-spacing: -0.02em;
+  }
+
+  .stat-label {
+    font-family: var(--font-serif-sc);
+    font-size: 9px;
+    letter-spacing: 0.2em;
+    color: var(--text-muted);
+    text-transform: uppercase;
   }
 
   .transcript-body {
@@ -295,6 +384,13 @@ const STYLES = `
   }
 
   .word-low:hover { background: #322e28; }
+
+  .word-committed {
+    color: var(--text-primary);
+    border-bottom: 1px solid #4a7a4a;
+    border-radius: 2px;
+    padding: 0 2px;
+  }
 
   .word-editing {
     background: #2a2520;
@@ -333,55 +429,31 @@ const STYLES = `
     z-index: 10;
   }
 
-  .stats-row {
-    display: flex;
-    gap: 32px;
-    margin-bottom: 40px;
-    padding: 20px 0;
-    border-top: 1px solid var(--border-subtle);
-    border-bottom: 1px solid var(--border-subtle);
-  }
-
-  .stat { display: flex; flex-direction: column; gap: 4px; }
-
-  .stat-value {
-    font-size: 22px;
-    font-weight: 500;
-    color: var(--text-primary);
-    letter-spacing: -0.02em;
-  }
-
-  .stat-label {
-    font-family: var(--font-serif-sc);
-    font-size: 9px;
-    letter-spacing: 0.2em;
-    color: var(--text-muted);
-    text-transform: uppercase;
-  }
-
-  .actions-row {
-    display: flex;
-    gap: 12px;
-    margin-top: 36px;
-  }
-
-  .action-btn {
-    background: none;
+  .transcript-textarea {
+    width: 100%;
+    background: var(--bg-card);
     border: 1px solid var(--border);
-    border-radius: 4px;
-    padding: 10px 20px;
-    font-family: var(--font-serif-sc);
-    font-size: 9px;
-    letter-spacing: 0.2em;
-    color: var(--text-secondary);
-    cursor: pointer;
-    text-transform: uppercase;
-    transition: all 0.2s;
+    border-radius: 6px;
+    padding: 28px 32px;
+    font-family: var(--font-serif);
+    font-size: 19px;
+    line-height: 1.85;
+    color: var(--text-primary);
+    letter-spacing: 0.005em;
+    resize: vertical;
+    outline: none;
+    min-height: 320px;
+    transition: border-color 0.2s;
   }
 
-  .action-btn:hover {
-    border-color: var(--accent-dim);
-    color: var(--accent);
+  .transcript-textarea:focus { border-color: var(--accent-dim); }
+
+  .edit-hint {
+    font-size: 12px;
+    color: var(--text-muted);
+    font-style: italic;
+    margin-top: 10px;
+    text-align: right;
   }
 
   .error-box {
@@ -408,9 +480,25 @@ const STYLES = `
     display: flex;
     justify-content: space-between;
   }
+
+  .new-btn {
+    background: none;
+    border: 1px solid var(--border-subtle);
+    border-radius: 4px;
+    padding: 10px 20px;
+    font-family: var(--font-serif-sc);
+    font-size: 9px;
+    letter-spacing: 0.2em;
+    color: var(--text-muted);
+    cursor: pointer;
+    text-transform: uppercase;
+    transition: all 0.2s;
+  }
+  .new-btn:hover { border-color: var(--accent-dim); color: var(--accent); }
 `;
 
 const CONFIDENCE_THRESHOLD = 0.75;
+const SMS_CHAR_LIMIT = 1600;
 const API = "/.netlify/functions/transcribe";
 
 function formatBytes(bytes) {
@@ -425,12 +513,12 @@ function formatDuration(ms) {
   return m > 0 ? `${m}m ${s % 60}s` : `${s}s`;
 }
 
-function Word({ word, index, onEdit }) {
+function Word({ word, index, onEdit, onCommit }) {
   const [editing, setEditing] = useState(false);
   const [hovered, setHovered] = useState(false);
   const [val, setVal] = useState(word.text);
   const inputRef = useRef(null);
-  const isLow = word.confidence !== null && word.confidence < CONFIDENCE_THRESHOLD;
+  const isLow = word.confidence !== null && word.confidence < CONFIDENCE_THRESHOLD && !word.committed;
 
   const startEdit = () => {
     if (!isLow) return;
@@ -439,7 +527,15 @@ function Word({ word, index, onEdit }) {
   };
 
   const commitEdit = () => { setEditing(false); onEdit(index, val); };
-  const handleKey = (e) => { if (e.key === "Enter" || e.key === "Escape") commitEdit(); };
+
+  const handleKey = (e) => {
+    if (e.key === "Enter") { commitEdit(); onCommit(index); }
+    if (e.key === "Escape") commitEdit();
+  };
+
+  if (word.committed) {
+    return <span className="word word-committed">{word.text}</span>;
+  }
 
   if (isLow) {
     return (
@@ -451,7 +547,7 @@ function Word({ word, index, onEdit }) {
       >
         {hovered && !editing && (
           <span className="confidence-tip">
-            {Math.round(word.confidence * 100)}% confidence - click to edit
+            {Math.round(word.confidence * 100)}% - click to edit, Enter to commit
           </span>
         )}
         {editing ? (
@@ -469,7 +565,7 @@ function Word({ word, index, onEdit }) {
     );
   }
 
-  return <span className="word word-normal">{val}</span>;
+  return <span className="word word-normal">{word.text}</span>;
 }
 
 export default function App() {
@@ -479,9 +575,15 @@ export default function App() {
   const [progress, setProgress] = useState(0);
   const [progressLabel, setProgressLabel] = useState("");
   const [words, setWords] = useState([]);
+  const [editedText, setEditedText] = useState("");
   const [audioDuration, setAudioDuration] = useState(null);
   const [error, setError] = useState(null);
-  const [copied, setCopied] = useState(false);
+  const [copiedTop, setCopiedTop] = useState(false);
+  const [copiedBottom, setCopiedBottom] = useState(false);
+  const [editMode, setEditMode] = useState(false);
+  const [shareOpen, setShareOpen] = useState(false);
+  const [shareOpenBottom, setShareOpenBottom] = useState(false);
+  const [showSmsWarning, setShowSmsWarning] = useState(false);
   const fileInputRef = useRef(null);
 
   const handleDrop = useCallback((e) => {
@@ -511,12 +613,13 @@ export default function App() {
     if (!file) return;
     setError(null);
     setWords([]);
+    setEditedText("");
+    setEditMode(false);
     setStatus("uploading");
     setProgress(10);
     setProgressLabel("Getting upload token...");
 
     try {
-      // Get API key from server - audio never passes through Netlify
       const tokenRes = await fetch(API, {
         method: "POST",
         headers: { "content-type": "application/json" },
@@ -527,7 +630,6 @@ export default function App() {
       setProgress(20);
       setProgressLabel("Uploading audio...");
 
-      // Upload directly from browser to AssemblyAI - no size limit
       const uploadRes = await fetch("https://api.assemblyai.com/v2/upload", {
         method: "POST",
         headers: { authorization: key },
@@ -552,14 +654,15 @@ export default function App() {
         if (data.status === "completed") {
           setProgress(100);
           setProgressLabel("Complete");
-          setWords(
-            (data.words || []).map((w) => ({
-              text: w.text,
-              confidence: w.confidence ?? null,
-              start: w.start,
-              end: w.end,
-            }))
-          );
+          const wordList = (data.words || []).map((w) => ({
+            text: w.text,
+            confidence: w.confidence ?? null,
+            start: w.start,
+            end: w.end,
+            committed: false,
+          }));
+          setWords(wordList);
+          setEditedText(wordList.map((w) => w.text).join(" "));
           setAudioDuration(data.audio_duration);
           setStatus("done");
           break;
@@ -581,29 +684,123 @@ export default function App() {
   const handleWordEdit = (index, newText) => {
     setWords((prev) => {
       const next = [...prev];
-      next[index] = { ...next[index], text: newText, edited: true };
+      next[index] = { ...next[index], text: newText };
       return next;
     });
   };
 
-  const copyTranscript = () => {
-    navigator.clipboard.writeText(words.map((w) => w.text).join(" "));
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+  const handleCommit = (index) => {
+    setWords((prev) => {
+      const next = [...prev];
+      next[index] = { ...next[index], committed: true };
+      return next;
+    });
+  };
+
+  const commitAllEdited = () => {
+    setWords((prev) =>
+      prev.map((w) =>
+        w.confidence !== null && w.confidence < CONFIDENCE_THRESHOLD
+          ? { ...w, committed: true }
+          : w
+      )
+    );
+  };
+
+  const getFullText = () =>
+    editMode ? editedText : words.map((w) => w.text).join(" ");
+
+  const copyText = (setCopiedFn) => {
+    navigator.clipboard.writeText(getFullText());
+    setCopiedFn(true);
+    setTimeout(() => setCopiedFn(false), 2000);
+  };
+
+  const downloadTxt = () => {
+    const blob = new Blob([getFullText()], { type: "text/plain" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "transcript.txt";
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const downloadPdf = async () => {
+    const { jsPDF } = await import("https://cdn.skypack.dev/jspdf");
+    const doc = new jsPDF({ unit: "pt", format: "letter" });
+    const text = getFullText();
+    const margin = 72;
+    const maxWidth = doc.internal.pageSize.getWidth() - margin * 2;
+    doc.setFont("Times", "normal");
+    doc.setFontSize(13);
+    const lines = doc.splitTextToSize(text, maxWidth);
+    let y = margin;
+    lines.forEach((line) => {
+      if (y > doc.internal.pageSize.getHeight() - margin) {
+        doc.addPage();
+        y = margin;
+      }
+      doc.text(line, margin, y);
+      y += 20;
+    });
+    doc.save("transcript.pdf");
+  };
+
+  const downloadDocx = async () => {
+    const { Document, Packer, Paragraph, TextRun } = await import(
+      "https://cdn.skypack.dev/docx"
+    );
+    const doc = new Document({
+      sections: [{
+        children: [
+          new Paragraph({
+            children: [new TextRun({ text: getFullText(), font: "Times New Roman", size: 26 })],
+          }),
+        ],
+      }],
+    });
+    const blob = await Packer.toBlob(doc);
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "transcript.docx";
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const shareEmail = () => {
+    const body = encodeURIComponent(getFullText());
+    window.open(`mailto:?subject=${encodeURIComponent("Transcript")}&body=${body}`);
+  };
+
+  const shareSms = () => {
+    const text = getFullText();
+    if (text.length > SMS_CHAR_LIMIT) {
+      setShowSmsWarning(true);
+      setTimeout(() => setShowSmsWarning(false), 7000);
+      return;
+    }
+    window.open(`sms:?body=${encodeURIComponent(text)}`);
   };
 
   const reset = () => {
     setFile(null);
     setWords([]);
+    setEditedText("");
     setStatus("idle");
     setProgress(0);
     setError(null);
     setAudioDuration(null);
+    setEditMode(false);
+    setShareOpen(false);
+    setShareOpenBottom(false);
+    setShowSmsWarning(false);
     if (fileInputRef.current) fileInputRef.current.value = "";
   };
 
   const lowConfWords = words.filter(
-    (w) => w.confidence !== null && w.confidence < CONFIDENCE_THRESHOLD
+    (w) => w.confidence !== null && w.confidence < CONFIDENCE_THRESHOLD && !w.committed
   );
   const avgConf =
     words.length > 0
@@ -613,16 +810,93 @@ export default function App() {
   const renderTranscript = () => {
     let out = [];
     for (let i = 0; i < words.length; i++) {
-      out.push(<Word key={i} word={words[i]} index={i} onEdit={handleWordEdit} />);
+      out.push(
+        <Word key={i} word={words[i]} index={i} onEdit={handleWordEdit} onCommit={handleCommit} />
+      );
       if (i < words.length - 1) out.push(" ");
     }
     return out;
   };
 
+  const Toolbar = ({ isBottom }) => {
+    const open = isBottom ? shareOpenBottom : shareOpen;
+    const setOpen = isBottom ? setShareOpenBottom : setShareOpen;
+    const setCopied = isBottom ? setCopiedBottom : setCopiedTop;
+    const copied = isBottom ? copiedBottom : copiedTop;
+
+    return (
+      <div className={`toolbar ${isBottom ? "toolbar-bottom" : ""}`}>
+        <button className="tool-btn" onClick={() => copyText(setCopied)}>
+          <span className="tool-icon">⎘</span>
+          {copied ? "Copied!" : "Copy"}
+        </button>
+
+        <div className="share-wrapper">
+          <button className="tool-btn" onClick={() => setOpen(!open)}>
+            <span className="tool-icon">↑</span>
+            Share
+          </button>
+          {open && (
+            <div className="share-menu">
+              <button className="share-item" onClick={() => { shareEmail(); setOpen(false); }}>
+                <span className="share-icon">✉</span> Email
+              </button>
+              <button className="share-item" onClick={() => { shareSms(); setOpen(false); }}>
+                <span className="share-icon">✆</span> SMS
+              </button>
+              <button className="share-item" onClick={() => { downloadTxt(); setOpen(false); }}>
+                <span className="share-icon">↓</span> Download TXT
+              </button>
+              <button className="share-item" onClick={() => { downloadPdf(); setOpen(false); }}>
+                <span className="share-icon">↓</span> Download PDF
+              </button>
+              <button className="share-item" onClick={() => { downloadDocx(); setOpen(false); }}>
+                <span className="share-icon">↓</span> Download Word
+              </button>
+            </div>
+          )}
+        </div>
+
+        {!isBottom && (
+          <>
+            <button
+              className={`tool-btn ${editMode ? "active" : ""}`}
+              onClick={() => {
+                if (!editMode) setEditedText(words.map((w) => w.text).join(" "));
+                setEditMode(!editMode);
+              }}
+            >
+              <span className="tool-icon">✎</span>
+              {editMode ? "Done Editing" : "Edit"}
+            </button>
+
+            {!editMode && lowConfWords.length > 0 && (
+              <button className="tool-btn commit-btn" onClick={commitAllEdited}>
+                <span className="tool-icon">✓</span>
+                Commit All
+              </button>
+            )}
+          </>
+        )}
+
+        {isBottom && (
+          <button className="new-btn" onClick={reset}>
+            New Recording
+          </button>
+        )}
+      </div>
+    );
+  };
+
   return (
     <>
       <style>{STYLES}</style>
-      <div className="app">
+      <div className="app" onClick={(e) => {
+        if (!e.target.closest(".share-wrapper")) {
+          setShareOpen(false);
+          setShareOpenBottom(false);
+        }
+      }}>
         <header className="header">
           <div className="header-eyebrow">Transcription Studio</div>
           <h1 className="header-title">Every word, <em>examined.</em></h1>
@@ -719,25 +993,40 @@ export default function App() {
             </div>
 
             <div className="transcript-header">
-              <div className="transcript-title">Transcript</div>
-              <div className="transcript-meta">
-                <div className="legend-item">
-                  <span className="legend-swatch" />
-                  Under 75% confidence
-                </div>
+              <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
+                <div className="transcript-title">Transcript</div>
+                {!editMode && (
+                  <div className="legend-item">
+                    <span className="legend-swatch" />
+                    Under 75% confidence
+                  </div>
+                )}
               </div>
             </div>
 
-            <div className="transcript-body">{renderTranscript()}</div>
+            <Toolbar isBottom={false} />
 
-            <div className="actions-row">
-              <button className="action-btn" onClick={copyTranscript}>
-                {copied ? "Copied" : "Copy Transcript"}
-              </button>
-              <button className="action-btn" onClick={reset}>
-                New Recording
-              </button>
-            </div>
+            {showSmsWarning && (
+              <div className="sms-warning">
+                Your transcript is {getFullText().length.toLocaleString()} characters. SMS works best under {SMS_CHAR_LIMIT.toLocaleString()} - consider Email or Download TXT instead.
+              </div>
+            )}
+
+            {editMode ? (
+              <>
+                <textarea
+                  className="transcript-textarea"
+                  value={editedText}
+                  onChange={(e) => setEditedText(e.target.value)}
+                  spellCheck={true}
+                />
+                <div className="edit-hint">Full transcript editing mode - spell check active</div>
+              </>
+            ) : (
+              <div className="transcript-body">{renderTranscript()}</div>
+            )}
+
+            <Toolbar isBottom={true} />
           </div>
         )}
 
