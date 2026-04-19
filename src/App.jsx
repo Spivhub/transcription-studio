@@ -377,6 +377,19 @@ const STYLES = `
     color: var(--text-primary);
     font-weight: 400;
     letter-spacing: 0.005em;
+    border-radius: 6px;
+    border: 1px solid transparent;
+    padding: 20px 4px;
+    transition: border-color 0.2s;
+    outline: none;
+    cursor: default;
+  }
+
+  .transcript-body.edit-active {
+    border-color: var(--border);
+    cursor: text;
+    padding: 20px;
+    background: #131311;
   }
 
   .word { display: inline; cursor: default; }
@@ -439,32 +452,17 @@ const STYLES = `
     z-index: 10;
   }
 
-  .transcript-textarea {
-    width: 100%;
-    background: var(--bg-card);
-    border: 1px solid var(--border);
-    border-radius: 6px;
-    padding: 28px 32px;
-    font-family: var(--font-serif);
-    font-size: 19px;
-    line-height: 1.85;
-    color: var(--text-primary);
-    letter-spacing: 0.005em;
-    resize: vertical;
-    outline: none;
-    min-height: 320px;
-    transition: border-color 0.2s;
-  }
-
-  .transcript-textarea:focus { border-color: var(--accent-dim); }
-
   .edit-hint {
-    font-size: 12px;
+    font-size: 11px;
     color: var(--text-muted);
     font-style: italic;
-    margin-top: 10px;
+    margin-top: 8px;
     text-align: right;
+    opacity: 0;
+    transition: opacity 0.3s;
   }
+
+  .edit-hint.visible { opacity: 1; }
 
   .error-box {
     background: #1e1614;
@@ -871,10 +869,7 @@ export default function App() {
           <>
             <button
               className={`tool-btn ${editMode ? "active" : ""}`}
-              onClick={() => {
-                if (!editMode) setEditedText(words.map((w) => w.text).join(" "));
-                setEditMode(!editMode);
-              }}
+              onClick={() => setEditMode(!editMode)}
             >
               <span className="tool-icon">✎</span>
               {editMode ? "Done Editing" : "Edit"}
@@ -1022,19 +1017,17 @@ export default function App() {
               </div>
             )}
 
-            {editMode ? (
-              <>
-                <textarea
-                  className="transcript-textarea"
-                  value={editedText}
-                  onChange={(e) => setEditedText(e.target.value)}
-                  spellCheck={true}
-                />
-                <div className="edit-hint">Full transcript editing mode - spell check active</div>
-              </>
-            ) : (
-              <div className="transcript-body">{renderTranscript()}</div>
-            )}
+            <div
+              className={`transcript-body ${editMode ? "edit-active" : ""}`}
+              contentEditable={editMode}
+              suppressContentEditableWarning={true}
+              spellCheck={editMode}
+            >
+              {renderTranscript()}
+            </div>
+            <div className={`edit-hint ${editMode ? "visible" : ""}`}>
+              Click any word to edit - highlighted words retain full functionality
+            </div>
 
             <Toolbar isBottom={true} />
           </div>
