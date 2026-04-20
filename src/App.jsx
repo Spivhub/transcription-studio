@@ -410,9 +410,6 @@ const STYLES = `
 
   .word-committed {
     color: var(--text-primary);
-    border-bottom: 1px solid #4a7a4a;
-    border-radius: 2px;
-    padding: 0 2px;
   }
 
   .word-editing {
@@ -542,7 +539,7 @@ function Word({ word, index, onEdit, onCommit }) {
   };
 
   if (word.committed) {
-    return <span className="word word-committed">{word.text}</span>;
+    return <span className="word word-normal">{word.text}</span>;
   }
 
   if (isLow) {
@@ -715,8 +712,14 @@ export default function App() {
     );
   };
 
-  const getFullText = () =>
-    editMode ? editedText : words.map((w) => w.text).join(" ");
+  const transcriptRef = useRef(null);
+
+  const getFullText = () => {
+    if (transcriptRef.current) {
+      return transcriptRef.current.innerText.trim();
+    }
+    return words.map((w) => w.text).join(" ");
+  };
 
   const copyText = (setCopiedFn) => {
     navigator.clipboard.writeText(getFullText());
@@ -1018,6 +1021,7 @@ export default function App() {
             )}
 
             <div
+              ref={transcriptRef}
               className={`transcript-body ${editMode ? "edit-active" : ""}`}
               contentEditable={editMode}
               suppressContentEditableWarning={true}
