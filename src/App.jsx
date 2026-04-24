@@ -983,6 +983,7 @@ export default function App() {
   const [showSmsWarning, setShowSmsWarning] = useState(false);
 
   const [editMode, setEditMode] = useState(false);
+  const [allCommitted, setAllCommitted] = useState(false);
   const [editedText, setEditedText] = useState("");
   const [pendingEdits, setPendingEdits] = useState({});
   const [saveIndicator, setSaveIndicator] = useState(false);
@@ -1213,6 +1214,18 @@ export default function App() {
       )
     );
     setPendingEdits({});
+    setAllCommitted(true);
+  };
+
+  const restoreHighlights = () => {
+    setWords((prev) =>
+      prev.map((w) =>
+        w.confidence !== null && w.confidence < CONFIDENCE_THRESHOLD
+          ? { ...w, committed: false }
+          : w
+      )
+    );
+    setAllCommitted(false);
   };
 
   // ── Copy / share ──
@@ -1237,13 +1250,138 @@ export default function App() {
 
   const downloadPdf = () => {
     const text = getFullText();
-    const printWindow = window.open("", "_blank");
-    const style = "body{font-family:Georgia,serif;font-size:13pt;line-height:1.8;margin:72pt;color:#000;}p{margin:0 0 1em 0;}";
-    const body = text.split("\n").map(function(line){ return "<p>" + line + "</p>"; }).join("");
-    const html = "<html><head><title>Transcript</title><style>" + style + "</style></head><body>" + body + "<scr" + "ipt>window.onload=function(){window.print();}</" + "script></body></html>";
-    printWindow.document.write(html);
-    printWindow.document.close();
+    const lines = [];
+    const maxChars = 90;
+    const words = text.split(" ");
+    let current = "";
+    words.forEach((word) => {
+      const test = current ? current + " " + word : word;
+      if (test.length > maxChars && current) {
+        lines.push(current);
+        current = word;
+      } else {
+        current = test;
+      }
+    });
+    if (current) lines.push(current);
+
+    // PDF spec constants
+    const fontSize = 12;
+    const leading = 18;
+    const marginX = 72;
+    const marginY = 72;
+    const pageHeight = 792;
+    const pageWidth = 612;
+    const usableHeight = pageHeight - marginY * 2;
+    const linesPerPage = Math.floor(usableHeight / leading);
+
+    // Split into pages
+    const pages = [];
+    for (let i = 0; i < lines.length; i += linesPerPage) {
+      pages.push(lines.slice(i, i + linesPerPage));
+    }
+    if (pages.length === 0) pages.push([""]);
+
+    // Build PDF content streams
+    const pdfLines = [];
+    const objOffsets = [];
+    let offset = 0;
+
+    const addLine = (s) => { pdfLines.push(s); offset += s.length + 1; };
+
+    // Header
+    addLine("%PDF-1.4");
+
+    // Font object - obj 1
+    objOffsets[1] = offset;
+    addLine("1 0 obj");
+    addLine("<< /Type /Font /Subtype /Type1 /BaseFont /Times-Roman /Encoding /WinAnsiEncoding >>");
+    addLine("endobj");
+
+    // Page content streams and page objects
+    const pageObjStart = 3;
+    const streamObjs = [];
+    const pageObjs = [];
+
+    pages.forEach((pageLines, pi) => {
+      // Stream object
+      const streamObjIdx = pageObjStart + pi * 2;
+      const pageObjIdx = pageObjStart + pi * 2 + 1;
+
+      let stream = "BT
+/F1 " + fontSize + " Tf
+" + marginX + " " + (pageHeight - marginY) + " Td
+" + leading + " TL
+";
+      pageLines.forEach((line) => {
+        const safe = line
+          .replace(/\\/g, "\\")
+          .replace(/\(/g, "\(")
+          .replace(/\)/g, "\)");
+        stream += "(" + safe + ") Tj T*
+";
+      });
+      stream += "ET";
+
+      const streamBytes = stream.length;
+      objOffsets[streamObjIdx] = offset;
+      addLine(streamObjIdx + " 0 obj");
+      addLine("<< /Length " + streamBytes + " >>");
+      addLine("stream");
+      addLine(stream);
+      addLine("endstream");
+      addLine("endobj");
+      streamObjs.push(streamObjIdx);
+
+      // Page object
+      objOffsets[pageObjIdx] = offset;
+      addLine(pageObjIdx + " 0 obj");
+      addLine("<< /Type /Page /Parent 2 0 R /MediaBox [0 0 " + pageWidth + " " + pageHeight + "] /Contents " + streamObjIdx + " 0 R /Resources << /Font << /F1 1 0 R >> >> >>");
+      addLine("endobj");
+      pageObjs.push(pageObjIdx);
+    });
+
+    // Pages object - obj 2
+    objOffsets[2] = offset;
+    addLine("2 0 obj");
+    addLine("<< /Type /Pages /Kids [" + pageObjs.map((n) => n + " 0 R").join(" ") + "] /Count " + pageObjs.length + " >>");
+    addLine("endobj");
+
+    // Catalog - next obj
+    const catalogIdx = pageObjStart + pages.length * 2;
+    objOffsets[catalogIdx] = offset;
+    addLine(catalogIdx + " 0 obj");
+    addLine("<< /Type /Catalog /Pages 2 0 R >>");
+    addLine("endobj");
+
+    // xref
+    const xrefOffset = offset;
+    const totalObjs = catalogIdx + 1;
+    addLine("xref");
+    addLine("0 " + totalObjs);
+    addLine("0000000000 65535 f ");
+    for (let i = 1; i < totalObjs; i++) {
+      const off = objOffsets[i] || 0;
+      addLine(String(off).padStart(10, "0") + " 00000 n ");
+    }
+    addLine("trailer");
+    addLine("<< /Size " + totalObjs + " /Root " + catalogIdx + " 0 R >>");
+    addLine("startxref");
+    addLine(String(xrefOffset));
+    addLine("%%EOF");
+
+    const pdfText = pdfLines.join("
+");
+    const blob = new Blob([pdfText], { type: "application/pdf" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "transcript.pdf";
+    a.click();
+    URL.revokeObjectURL(url);
   };
+
+
 
   const downloadDocx = async () => {
     const { Document, Packer, Paragraph, TextRun } = await import("https://cdn.skypack.dev/docx");
@@ -1274,7 +1412,7 @@ export default function App() {
   const reset = () => {
     setFile(null); setWords([]); setStatus("idle");
     setProgress(0); setError(null); setAudioDuration(null);
-    setPendingEdits({}); setEditMode(false); setEditedText(""); setShareOpen(false); setShareOpenBottom(false);
+    setPendingEdits({}); setEditMode(false); setEditedText(""); setAllCommitted(false); setShareOpen(false); setShareOpenBottom(false);
     setShowSmsWarning(false);
     if (fileInputRef.current) fileInputRef.current.value = "";
   };
@@ -1356,9 +1494,14 @@ export default function App() {
               <span className="tool-icon">✎</span>
               {editMode ? "Done Editing" : "Edit"}
             </button>
-            {lowConfWords.length > 0 && (
+            {!allCommitted && lowConfWords.length > 0 && (
               <button className="tool-btn commit-btn" onClick={commitAllPending}>
                 <span className="tool-icon">✓</span> Commit All
+              </button>
+            )}
+            {allCommitted && (
+              <button className="tool-btn" onClick={restoreHighlights}>
+                <span className="tool-icon">◎</span> Restore Highlights
               </button>
             )}
           </>
