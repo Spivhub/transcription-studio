@@ -911,15 +911,29 @@ function Word({ word, index, onEdit, onPendingChange }) {
           </span>
         )}
         {editing ? (
-          <input
-            ref={inputRef}
-            className="word-input"
-            value={val}
-            onChange={(e) => setVal(e.target.value)}
-            onBlur={() => finishEdit(false)}
-            onKeyDown={handleKey}
-            size={Math.max(val.length, 3)}
-          />
+          <>
+            <input
+              ref={inputRef}
+              className="word-input"
+              value={val}
+              onChange={(e) => setVal(e.target.value)}
+              onBlur={() => finishEdit(false)}
+              onKeyDown={handleKey}
+              size={Math.max(val.length, 3)}
+            />
+            <span
+              style={{
+                fontSize: "10px",
+                marginLeft: "4px",
+                cursor: "pointer",
+                fontFamily: "var(--font-serif-sc)",
+                letterSpacing: "0.1em",
+                color: "#90c090",
+                textTransform: "uppercase",
+              }}
+              onMouseDown={(e) => { e.preventDefault(); finishEdit(true); }}
+            >commit</span>
+          </>
         ) : (
           <span onClick={startEdit}>{word.text}</span>
         )}
@@ -956,6 +970,8 @@ export default function App() {
   const [shareOpenBottom, setShareOpenBottom] = useState(false);
   const [showSmsWarning, setShowSmsWarning] = useState(false);
 
+  const [editMode, setEditMode] = useState(false);
+  const [editedText, setEditedText] = useState("");
   const [pendingEdits, setPendingEdits] = useState({});
   const [saveIndicator, setSaveIndicator] = useState(false);
 
@@ -1177,6 +1193,7 @@ export default function App() {
 
   // ── Copy / share ──
   const getFullText = () => {
+    if (editMode) return editedText;
     if (transcriptRef.current) return transcriptRef.current.innerText.trim();
     return words.map((w) => w.text).join(" ");
   };
@@ -1242,7 +1259,7 @@ export default function App() {
   const reset = () => {
     setFile(null); setWords([]); setStatus("idle");
     setProgress(0); setError(null); setAudioDuration(null);
-    setPendingEdits({}); setShareOpen(false); setShareOpenBottom(false);
+    setPendingEdits({}); setEditMode(false); setEditedText(""); setShareOpen(false); setShareOpenBottom(false);
     setShowSmsWarning(false);
     if (fileInputRef.current) fileInputRef.current.value = "";
   };
@@ -1312,10 +1329,24 @@ export default function App() {
           )}
         </div>
 
-        {!isBottom && lowConfWords.length > 0 && (
-          <button className="tool-btn commit-btn" onClick={commitAllPending}>
-            <span className="tool-icon">✓</span> Commit All
-          </button>
+        {!isBottom && (
+          <>
+            <button
+              className={`tool-btn ${editMode ? "active" : ""}`}
+              onClick={() => {
+                if (!editMode) setEditedText(words.map((w) => w.text).join(" "));
+                setEditMode(!editMode);
+              }}
+            >
+              <span className="tool-icon">✎</span>
+              {editMode ? "Done Editing" : "Edit"}
+            </button>
+            {lowConfWords.length > 0 && (
+              <button className="tool-btn commit-btn" onClick={commitAllPending}>
+                <span className="tool-icon">✓</span> Commit All
+              </button>
+            )}
+          </>
         )}
 
         {isBottom && (
@@ -1528,9 +1559,19 @@ export default function App() {
               </div>
             )}
 
-            <div className="transcript-body" ref={transcriptRef}>
-              {renderTranscript()}
-            </div>
+            {editMode ? (
+              <textarea
+                className="transcript-textarea"
+                value={editedText}
+                onChange={(e) => setEditedText(e.target.value)}
+                spellCheck={true}
+                ref={transcriptRef}
+              />
+            ) : (
+              <div className="transcript-body" ref={transcriptRef}>
+                {renderTranscript()}
+              </div>
+            )}
 
             <Toolbar isBottom={true} />
           </div>
