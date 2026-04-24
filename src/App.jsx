@@ -1224,7 +1224,8 @@ export default function App() {
   };
 
   const downloadPdf = async () => {
-    const { jsPDF } = await import("https://cdn.skypack.dev/jspdf");
+    const jsPDFModule = await import("jspdf");
+    const jsPDF = jsPDFModule.jsPDF || jsPDFModule.default;
     const doc = new jsPDF({ unit: "pt", format: "letter" });
     const text = getFullText();
     const margin = 72;
