@@ -711,6 +711,18 @@ const STYLES = `
     color: var(--text-primary);
     font-weight: 400;
     letter-spacing: 0.005em;
+    border: 1px solid transparent;
+    border-radius: 6px;
+    padding: 4px;
+    transition: border-color 0.25s, background 0.25s, padding 0.25s;
+    outline: none;
+  }
+
+  .transcript-body.edit-active {
+    border-color: var(--border);
+    background: #131311;
+    padding: 20px 24px;
+    cursor: text;
   }
 
   .word { display: inline; }
@@ -1193,7 +1205,6 @@ export default function App() {
 
   // ── Copy / share ──
   const getFullText = () => {
-    if (editMode) return editedText;
     if (transcriptRef.current) return transcriptRef.current.innerText.trim();
     return words.map((w) => w.text).join(" ");
   };
@@ -1559,19 +1570,18 @@ export default function App() {
               </div>
             )}
 
-            {editMode ? (
-              <textarea
-                className="transcript-textarea"
-                value={editedText}
-                onChange={(e) => setEditedText(e.target.value)}
-                spellCheck={true}
-                ref={transcriptRef}
-              />
-            ) : (
-              <div className="transcript-body" ref={transcriptRef}>
-                {renderTranscript()}
-              </div>
-            )}
+            <div
+              ref={transcriptRef}
+              className={`transcript-body ${editMode ? "edit-active" : ""}`}
+              contentEditable={editMode}
+              suppressContentEditableWarning={true}
+              spellCheck={editMode}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") e.preventDefault();
+              }}
+            >
+              {renderTranscript()}
+            </div>
 
             <Toolbar isBottom={true} />
           </div>
