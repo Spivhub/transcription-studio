@@ -994,6 +994,17 @@ export default function App() {
   const fileInputRef = useRef(null);
   const transcriptRef = useRef(null);
 
+  // ── Prevent browser from navigating on accidental drops outside drop zone ──
+  useEffect(() => {
+    const prevent = (e) => { e.preventDefault(); e.stopPropagation(); };
+    document.addEventListener("dragover", prevent);
+    document.addEventListener("drop", prevent);
+    return () => {
+      document.removeEventListener("dragover", prevent);
+      document.removeEventListener("drop", prevent);
+    };
+  }, []);
+
   // ── Auth init ──
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -1080,6 +1091,7 @@ export default function App() {
   // ── File handling ──
   const handleDrop = useCallback((e) => {
     e.preventDefault();
+    e.stopPropagation();
     setDragging(false);
     const f = e.dataTransfer.files[0];
     if (f) setFile(f);
@@ -1466,8 +1478,8 @@ export default function App() {
         {!file ? (
           <div
             className={`drop-zone ${dragging ? "dragging" : ""}`}
-            onDragOver={(e) => { e.preventDefault(); setDragging(true); }}
-            onDragLeave={() => setDragging(false)}
+            onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); setDragging(true); }}
+            onDragLeave={(e) => { e.preventDefault(); e.stopPropagation(); setDragging(false); }}
             onDrop={handleDrop}
             onClick={() => fileInputRef.current?.click()}
           >
