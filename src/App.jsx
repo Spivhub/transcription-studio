@@ -1257,38 +1257,9 @@ export default function App() {
 
     // Use print window as fallback - clean and reliable
     const printWindow = window.open("", "_blank");
-    printWindow.document.write(`
-      <!DOCTYPE html>
-      <html>
-      <head>
-        <title>Transcript</title>
-        <style>
-          @import url('https://fonts.googleapis.com/css2?family=Playfair+Display&display=swap');
-          body {
-            font-family: 'Playfair Display', Georgia, serif;
-            font-size: 13pt;
-            line-height: 1.8;
-            margin: 72pt;
-            color: #000;
-            background: #fff;
-          }
-          p { margin: 0 0 1em 0; }
-          @media print {
-            body { margin: 72pt; }
-          }
-        </style>
-      </head>
-      <body>
-        <p>${text.replace(/
-/g, "</p><p>")}</p>
-        <script>
-          window.onload = function() {
-            window.print();
-          };
-        </script>
-      </body>
-      </html>
-    `);
+    const htmlContent = "<!DOCTYPE html><html><head><title>Transcript</title><style>body{font-family:Georgia,serif;font-size:13pt;line-height:1.8;margin:72pt;color:#000;background:#fff;}p{margin:0 0 1em 0;}</style></head><body><p>" + text.replace(/
+/g, "</p><p>") + "</p><script>window.onload=function(){window.print()};<\/script></body></html>";
+    printWindow.document.write(htmlContent);
     printWindow.document.close();
   };
 
