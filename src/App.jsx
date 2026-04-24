@@ -1250,129 +1250,102 @@ export default function App() {
 
   const downloadPdf = () => {
     const text = getFullText();
-    const lines = [];
     const maxChars = 90;
-    const words = text.split(" ");
-    let current = "";
-    words.forEach((word) => {
-      const test = current ? current + " " + word : word;
-      if (test.length > maxChars && current) {
-        lines.push(current);
-        current = word;
-      } else {
-        current = test;
-      }
+    const wordList = text.split(" ");
+    const lines = [];
+    let cur = "";
+    wordList.forEach((w) => {
+      const t = cur ? cur + " " + w : w;
+      if (t.length > maxChars && cur) { lines.push(cur); cur = w; }
+      else cur = t;
     });
-    if (current) lines.push(current);
+    if (cur) lines.push(cur);
 
-    // PDF spec constants
-    const fontSize = 12;
-    const leading = 18;
-    const marginX = 72;
-    const marginY = 72;
-    const pageHeight = 792;
-    const pageWidth = 612;
-    const usableHeight = pageHeight - marginY * 2;
-    const linesPerPage = Math.floor(usableHeight / leading);
-
-    // Split into pages
+    const fs = 12;
+    const lead = 18;
+    const mx = 72;
+    const my = 72;
+    const ph = 792;
+    const pw = 612;
+    const lpp = Math.floor((ph - my * 2) / lead);
     const pages = [];
-    for (let i = 0; i < lines.length; i += linesPerPage) {
-      pages.push(lines.slice(i, i + linesPerPage));
-    }
-    if (pages.length === 0) pages.push([""]);
+    for (let i = 0; i < lines.length; i += lpp) pages.push(lines.slice(i, i + lpp));
+    if (!pages.length) pages.push([""]);
 
-    // Build PDF content streams
-    const pdfLines = [];
-    const objOffsets = [];
-    let offset = 0;
+    const out = [];
+    const offsets = [];
+    let pos = 0;
+    const ln = (s) => { out.push(s); pos += s.length + 1; };
 
-    const addLine = (s) => { pdfLines.push(s); offset += s.length + 1; };
+    ln("%PDF-1.4");
 
-    // Header
-    addLine("%PDF-1.4");
+    offsets[1] = pos;
+    ln("1 0 obj");
+    ln("<< /Type /Font /Subtype /Type1 /BaseFont /Times-Roman /Encoding /WinAnsiEncoding >>");
+    ln("endobj");
 
-    // Font object - obj 1
-    objOffsets[1] = offset;
-    addLine("1 0 obj");
-    addLine("<< /Type /Font /Subtype /Type1 /BaseFont /Times-Roman /Encoding /WinAnsiEncoding >>");
-    addLine("endobj");
+    const base = 3;
+    const streamNums = [];
+    const pageNums = [];
 
-    // Page content streams and page objects
-    const pageObjStart = 3;
-    const streamObjs = [];
-    const pageObjs = [];
-
-    pages.forEach((pageLines, pi) => {
-      // Stream object
-      const streamObjIdx = pageObjStart + pi * 2;
-      const pageObjIdx = pageObjStart + pi * 2 + 1;
-
-      let stream = "BT
-/F1 " + fontSize + " Tf
-" + marginX + " " + (pageHeight - marginY) + " Td
-" + leading + " TL
+    pages.forEach((pg, pi) => {
+      const sn = base + pi * 2;
+      const pn = base + pi * 2 + 1;
+      const ty = ph - my;
+      let s = "BT" + "
+" + "/F1 " + fs + " Tf" + "
+" + mx + " " + ty + " Td" + "
+" + lead + " TL" + "
 ";
-      pageLines.forEach((line) => {
-        const safe = line
-          .replace(/\\/g, "\\")
-          .replace(/\(/g, "\(")
-          .replace(/\)/g, "\)");
-        stream += "(" + safe + ") Tj T*
+      pg.forEach((line) => {
+        const safe = line.replace(/\/g, "\\").replace(/\(/g, "\(").replace(/\)/g, "\)");
+        s += "(" + safe + ") Tj T*" + "
 ";
       });
-      stream += "ET";
+      s += "ET";
+      offsets[sn] = pos;
+      ln(sn + " 0 obj");
+      ln("<< /Length " + s.length + " >>");
+      ln("stream");
+      ln(s);
+      ln("endstream");
+      ln("endobj");
+      streamNums.push(sn);
 
-      const streamBytes = stream.length;
-      objOffsets[streamObjIdx] = offset;
-      addLine(streamObjIdx + " 0 obj");
-      addLine("<< /Length " + streamBytes + " >>");
-      addLine("stream");
-      addLine(stream);
-      addLine("endstream");
-      addLine("endobj");
-      streamObjs.push(streamObjIdx);
-
-      // Page object
-      objOffsets[pageObjIdx] = offset;
-      addLine(pageObjIdx + " 0 obj");
-      addLine("<< /Type /Page /Parent 2 0 R /MediaBox [0 0 " + pageWidth + " " + pageHeight + "] /Contents " + streamObjIdx + " 0 R /Resources << /Font << /F1 1 0 R >> >> >>");
-      addLine("endobj");
-      pageObjs.push(pageObjIdx);
+      offsets[pn] = pos;
+      ln(pn + " 0 obj");
+      ln("<< /Type /Page /Parent 2 0 R /MediaBox [0 0 " + pw + " " + ph + "] /Contents " + sn + " 0 R /Resources << /Font << /F1 1 0 R >> >> >>");
+      ln("endobj");
+      pageNums.push(pn);
     });
 
-    // Pages object - obj 2
-    objOffsets[2] = offset;
-    addLine("2 0 obj");
-    addLine("<< /Type /Pages /Kids [" + pageObjs.map((n) => n + " 0 R").join(" ") + "] /Count " + pageObjs.length + " >>");
-    addLine("endobj");
+    offsets[2] = pos;
+    ln("2 0 obj");
+    ln("<< /Type /Pages /Kids [" + pageNums.map((n) => n + " 0 R").join(" ") + "] /Count " + pageNums.length + " >>");
+    ln("endobj");
 
-    // Catalog - next obj
-    const catalogIdx = pageObjStart + pages.length * 2;
-    objOffsets[catalogIdx] = offset;
-    addLine(catalogIdx + " 0 obj");
-    addLine("<< /Type /Catalog /Pages 2 0 R >>");
-    addLine("endobj");
+    const cat = base + pages.length * 2;
+    offsets[cat] = pos;
+    ln(cat + " 0 obj");
+    ln("<< /Type /Catalog /Pages 2 0 R >>");
+    ln("endobj");
 
-    // xref
-    const xrefOffset = offset;
-    const totalObjs = catalogIdx + 1;
-    addLine("xref");
-    addLine("0 " + totalObjs);
-    addLine("0000000000 65535 f ");
-    for (let i = 1; i < totalObjs; i++) {
-      const off = objOffsets[i] || 0;
-      addLine(String(off).padStart(10, "0") + " 00000 n ");
+    const xref = pos;
+    const total = cat + 1;
+    ln("xref");
+    ln("0 " + total);
+    ln("0000000000 65535 f ");
+    for (let i = 1; i < total; i++) {
+      ln(String(offsets[i] || 0).padStart(10, "0") + " 00000 n ");
     }
-    addLine("trailer");
-    addLine("<< /Size " + totalObjs + " /Root " + catalogIdx + " 0 R >>");
-    addLine("startxref");
-    addLine(String(xrefOffset));
-    addLine("%%EOF");
+    ln("trailer");
+    ln("<< /Size " + total + " /Root " + cat + " 0 R >>");
+    ln("startxref");
+    ln(String(xref));
+    ln("%%EOF");
 
-    const pdfText = pdfLines.join("
-");
-    const blob = new Blob([pdfText], { type: "application/pdf" });
+    const blob = new Blob([out.join("
+")], { type: "application/pdf" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
@@ -1380,8 +1353,6 @@ export default function App() {
     a.click();
     URL.revokeObjectURL(url);
   };
-
-
 
   const downloadDocx = async () => {
     const { Document, Packer, Paragraph, TextRun } = await import("https://cdn.skypack.dev/docx");
