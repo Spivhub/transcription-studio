@@ -1223,23 +1223,73 @@ export default function App() {
     URL.revokeObjectURL(url);
   };
 
-  const downloadPdf = async () => {
-    const jsPDFModule = await import("jspdf");
-    const jsPDF = jsPDFModule.jsPDF || jsPDFModule.default;
-    const doc = new jsPDF({ unit: "pt", format: "letter" });
+  const downloadPdf = () => {
     const text = getFullText();
+    const pageWidth = 595;
+    const pageHeight = 842;
     const margin = 72;
-    const maxWidth = doc.internal.pageSize.getWidth() - margin * 2;
-    doc.setFont("Times", "normal");
-    doc.setFontSize(13);
-    const lines = doc.splitTextToSize(text, maxWidth);
-    let y = margin;
-    lines.forEach((line) => {
-      if (y > doc.internal.pageSize.getHeight() - margin) { doc.addPage(); y = margin; }
-      doc.text(line, margin, y);
-      y += 20;
+    const lineHeight = 20;
+    const maxWidth = pageWidth - margin * 2;
+    const fontSize = 13;
+    const charsPerLine = Math.floor(maxWidth / (fontSize * 0.5));
+
+    // Word-wrap text
+    const words = text.split(" ");
+    const lines = [];
+    let current = "";
+    words.forEach((word) => {
+      const test = current ? current + " " + word : word;
+      if (test.length > charsPerLine && current) {
+        lines.push(current);
+        current = word;
+      } else {
+        current = test;
+      }
     });
-    doc.save("transcript.pdf");
+    if (current) lines.push(current);
+
+    // Build PDF manually as a data URI
+    const linesPerPage = Math.floor((pageHeight - margin * 2) / lineHeight);
+    const pages = [];
+    for (let i = 0; i < lines.length; i += linesPerPage) {
+      pages.push(lines.slice(i, i + linesPerPage));
+    }
+
+    // Use print window as fallback - clean and reliable
+    const printWindow = window.open("", "_blank");
+    printWindow.document.write(`
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <title>Transcript</title>
+        <style>
+          @import url('https://fonts.googleapis.com/css2?family=Playfair+Display&display=swap');
+          body {
+            font-family: 'Playfair Display', Georgia, serif;
+            font-size: 13pt;
+            line-height: 1.8;
+            margin: 72pt;
+            color: #000;
+            background: #fff;
+          }
+          p { margin: 0 0 1em 0; }
+          @media print {
+            body { margin: 72pt; }
+          }
+        </style>
+      </head>
+      <body>
+        <p>${text.replace(/
+/g, "</p><p>")}</p>
+        <script>
+          window.onload = function() {
+            window.print();
+          };
+        </script>
+      </body>
+      </html>
+    `);
+    printWindow.document.close();
   };
 
   const downloadDocx = async () => {
