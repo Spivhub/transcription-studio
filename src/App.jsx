@@ -1225,41 +1225,11 @@ export default function App() {
 
   const downloadPdf = () => {
     const text = getFullText();
-    const pageWidth = 595;
-    const pageHeight = 842;
-    const margin = 72;
-    const lineHeight = 20;
-    const maxWidth = pageWidth - margin * 2;
-    const fontSize = 13;
-    const charsPerLine = Math.floor(maxWidth / (fontSize * 0.5));
-
-    // Word-wrap text
-    const words = text.split(" ");
-    const lines = [];
-    let current = "";
-    words.forEach((word) => {
-      const test = current ? current + " " + word : word;
-      if (test.length > charsPerLine && current) {
-        lines.push(current);
-        current = word;
-      } else {
-        current = test;
-      }
-    });
-    if (current) lines.push(current);
-
-    // Build PDF manually as a data URI
-    const linesPerPage = Math.floor((pageHeight - margin * 2) / lineHeight);
-    const pages = [];
-    for (let i = 0; i < lines.length; i += linesPerPage) {
-      pages.push(lines.slice(i, i + linesPerPage));
-    }
-
-    // Use print window as fallback - clean and reliable
     const printWindow = window.open("", "_blank");
-    const htmlContent = "<!DOCTYPE html><html><head><title>Transcript</title><style>body{font-family:Georgia,serif;font-size:13pt;line-height:1.8;margin:72pt;color:#000;background:#fff;}p{margin:0 0 1em 0;}</style></head><body><p>" + text.replace(/
-/g, "</p><p>") + "</p><script>window.onload=function(){window.print()};<\/script></body></html>";
-    printWindow.document.write(htmlContent);
+    const style = "body{font-family:Georgia,serif;font-size:13pt;line-height:1.8;margin:72pt;color:#000;}p{margin:0 0 1em 0;}";
+    const body = text.split("\n").map(function(line){ return "<p>" + line + "</p>"; }).join("");
+    const html = "<html><head><title>Transcript</title><style>" + style + "</style></head><body>" + body + "<scr" + "ipt>window.onload=function(){window.print();}</" + "script></body></html>";
+    printWindow.document.write(html);
     printWindow.document.close();
   };
 
