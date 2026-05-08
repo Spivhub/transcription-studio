@@ -1228,14 +1228,32 @@ export default function App() {
   };
 
   const commitAllPending = () => {
-    setWords((prev) =>
-      prev.map((w) =>
-        w.confidence !== null && w.confidence < CONFIDENCE_THRESHOLD
-          ? { ...w, committed: true }
-          : w
-      )
-    );
+    // Sync any live DOM edits first before committing
+    if (editMode && transcriptRef.current) {
+      const liveText = transcriptRef.current.innerText.trim();
+      const liveWords = liveText.split(/\s+/).filter(Boolean);
+      setWords((prev) => {
+        const synced = prev.map((w, i) => ({
+          ...w,
+          text: liveWords[i] !== undefined ? liveWords[i] : w.text,
+        }));
+        return synced.map((w) =>
+          w.confidence !== null && w.confidence < CONFIDENCE_THRESHOLD
+            ? { ...w, committed: true }
+            : w
+        );
+      });
+    } else {
+      setWords((prev) =>
+        prev.map((w) =>
+          w.confidence !== null && w.confidence < CONFIDENCE_THRESHOLD
+            ? { ...w, committed: true }
+            : w
+        )
+      );
+    }
     setPendingEdits({});
+    setEditMode(false);
     setAllCommitted(true);
   };
 
@@ -1255,6 +1273,23 @@ export default function App() {
     );
     setAllCommitted(false);
     setPendingEdits({});
+  };
+
+  // ── Sync contentEditable edits back to words array ──
+  const syncEditsToWords = () => {
+    if (!transcriptRef.current) return;
+    const liveText = transcriptRef.current.innerText.trim();
+    if (!liveText) return;
+    const liveWords = liveText.split(/\s+/).filter(Boolean);
+    setWords((prev) => {
+      // Match live words back to original word slots by index
+      // Preserve confidence/committed/flagged metadata
+      const next = prev.map((w, i) => ({
+        ...w,
+        text: liveWords[i] !== undefined ? liveWords[i] : w.text,
+      }));
+      return next;
+    });
   };
 
   // ── Copy / share ──
@@ -1480,7 +1515,9 @@ export default function App() {
             <button
               className={`tool-btn ${editMode ? "active" : ""}`}
               onClick={() => {
-                if (!editMode) setEditedText(words.map((w) => w.text).join(" "));
+                if (editMode) {
+                  syncEditsToWords();
+                }
                 setEditMode(!editMode);
               }}
             >
