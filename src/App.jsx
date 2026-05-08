@@ -741,8 +741,12 @@ const STYLES = `
     letter-spacing: 0.005em;
     resize: none;
     outline: none;
-    min-height: 320px;
+    min-height: 60vh;
+    height: auto;
+    overflow-y: hidden;
+    display: block;
     transition: border-color 0.2s;
+    box-sizing: border-box;
   }
   .transcript-textarea:focus { border-color: var(--accent-dim); }
 
@@ -1037,6 +1041,14 @@ export default function App() {
       document.removeEventListener("drop", blockOutsideDrop);
     };
   }, []);
+
+  // ── Auto-size textarea when edit mode opens ──
+  useEffect(() => {
+    if (editMode && transcriptRef.current) {
+      transcriptRef.current.style.height = "auto";
+      transcriptRef.current.style.height = transcriptRef.current.scrollHeight + "px";
+    }
+  }, [editMode]);
 
   // ── Auth init ──
   useEffect(() => {
@@ -1784,6 +1796,13 @@ export default function App() {
                 defaultValue={words.map((w) => w.text).join(" ")}
                 spellCheck={true}
                 autoFocus
+                onInput={(e) => {
+                  e.target.style.height = "auto";
+                  e.target.style.height = e.target.scrollHeight + "px";
+                }}
+                onLoad={(e) => {
+                  e.target.style.height = e.target.scrollHeight + "px";
+                }}
               />
             ) : (
               <div
