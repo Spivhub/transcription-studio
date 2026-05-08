@@ -600,7 +600,9 @@ const STYLES = `
     background: #131311;
     padding: 20px 24px;
     width: 100%;
-    min-height: 200px;
+    min-height: 0;
+    height: auto;
+    overflow: hidden;
     outline: none;
     resize: none;
     font-family: var(--font-serif);
@@ -615,7 +617,9 @@ const STYLES = `
     border-color: var(--border);
     padding: 20px 24px;
     width: 100%;
-    min-height: 200px;
+    min-height: 0;
+    height: auto;
+    overflow: hidden;
     outline: none;
     resize: none;
     caret-color: var(--text-primary);
@@ -884,6 +888,17 @@ export default function App() {
     });
     return () => subscription.unsubscribe();
   }, []);
+
+  // ── Auto-size textarea when edit mode opens ──
+  useEffect(() => {
+    if (editMode && textareaRef.current) {
+      const el = textareaRef.current;
+      el.style.height = "auto";
+      el.style.height = el.scrollHeight + "px";
+      el.focus();
+      el.setSelectionRange(0, 0);
+    }
+  }, [editMode]);
 
   // ── Prevent browser navigation on drops outside drop zone ──
   useEffect(() => {
@@ -1546,8 +1561,9 @@ export default function App() {
                 value={editText}
                 onChange={(e) => {
                   setEditText(e.target.value);
-                  e.target.style.height = "auto";
-                  e.target.style.height = e.target.scrollHeight + "px";
+                  const el = e.target;
+                  el.style.height = "auto";
+                  el.style.height = el.scrollHeight + "px";
                 }}
                 spellCheck={true}
                 autoFocus
