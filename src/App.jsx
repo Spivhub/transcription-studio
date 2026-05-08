@@ -595,36 +595,41 @@ const STYLES = `
     padding: 4px;
     transition: border-color 0.25s, background 0.25s;
   }
-  .transcript-body.edit-active {
-    border-color: var(--border);
+  .transcript-body.edit-active-wrapper {
+    border: 1px solid var(--border);
+    border-radius: 6px;
     background: #131311;
     padding: 20px 24px;
-    width: 100%;
-    min-height: 0;
-    height: auto;
-    overflow: hidden;
-    outline: none;
-    resize: none;
-    font-family: var(--font-serif);
-    caret-color: var(--text-primary);
     cursor: text;
   }
-  textarea.transcript-body {
-    display: block;
-    font-family: var(--font-serif);
-    color: var(--text-primary);
-    background: #131311;
-    border-color: var(--border);
-    padding: 20px 24px;
+
+  .transcript-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
     width: 100%;
-    min-height: 0;
-    height: auto;
-    overflow: hidden;
+    height: 100%;
+    min-height: 100%;
+    background: transparent;
+    border: none;
     outline: none;
     resize: none;
+    font-family: var(--font-serif);
+    font-size: 19px;
+    line-height: 1.85;
+    letter-spacing: 0.005em;
+    color: transparent;
     caret-color: var(--text-primary);
+    padding: 20px 24px;
+    overflow: hidden;
+    z-index: 2;
+    cursor: text;
   }
-  textarea.transcript-body:focus { border-color: var(--accent-dim); }
+
+  .transcript-overlay::selection {
+    background: rgba(196, 168, 114, 0.25);
+    color: transparent;
+  }
 
   /* Words */
   .word { display: inline; }
@@ -889,14 +894,15 @@ export default function App() {
     return () => subscription.unsubscribe();
   }, []);
 
-  // ── Auto-size textarea when edit mode opens ──
+  // ── Auto-size overlay textarea when edit mode opens ──
   useEffect(() => {
-    if (editMode && textareaRef.current) {
+    if (editMode && textareaRef.current && transcriptRef.current) {
+      const wrapper = transcriptRef.current;
       const el = textareaRef.current;
+      // Match textarea height to the word span div height
       el.style.height = "auto";
-      el.style.height = el.scrollHeight + "px";
+      el.style.height = Math.max(el.scrollHeight, wrapper.scrollHeight) + "px";
       el.focus();
-      el.setSelectionRange(0, 0);
     }
   }, [editMode]);
 
@@ -1554,25 +1560,30 @@ export default function App() {
               </div>
             )}
 
-            {editMode ? (
-              <textarea
-                ref={textareaRef}
-                className="transcript-body edit-active"
-                value={editText}
-                onChange={(e) => {
-                  setEditText(e.target.value);
-                  const el = e.target;
-                  el.style.height = "auto";
-                  el.style.height = el.scrollHeight + "px";
-                }}
-                spellCheck={true}
-                autoFocus
-              />
-            ) : (
-              <div ref={transcriptRef} className="transcript-body">
+            <div
+              ref={transcriptRef}
+              className={"transcript-body" + (editMode ? " edit-active-wrapper" : "")}
+              style={{ position: "relative" }}
+            >
+              <div style={{ pointerEvents: editMode ? "none" : "auto" }}>
                 {renderTranscript()}
               </div>
-            )}
+              {editMode && (
+                <textarea
+                  ref={textareaRef}
+                  className="transcript-overlay"
+                  value={editText}
+                  onChange={(e) => {
+                    setEditText(e.target.value);
+                    const el = e.target;
+                    el.style.height = "auto";
+                    el.style.height = el.scrollHeight + "px";
+                  }}
+                  spellCheck={true}
+                  autoFocus
+                />
+              )}
+            </div>
 
             <Toolbar isBottom={true} />
           </div>
