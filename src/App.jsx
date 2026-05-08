@@ -1317,11 +1317,7 @@ export default function App() {
       const sn = base + pi * 2;
       const pn = base + pi * 2 + 1;
       const ty = ph - my;
-      let s = "BT" + "
-" + "/F1 " + fs + " Tf" + "
-" + mx + " " + ty + " Td" + "
-" + lead + " TL" + "
-";
+      let s = "BT\n/F1 " + fs + " Tf\n" + mx + " " + ty + " Td\n" + lead + " TL\n";
       pg.forEach((line) => {
         const safe = line.replace(/\/g, "\\").replace(/\(/g, "\(").replace(/\)/g, "\)");
         s += "(" + safe + ") Tj T*" + "
