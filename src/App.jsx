@@ -728,6 +728,24 @@ const STYLES = `
   .word { display: inline; }
   .word-normal { color: var(--text-primary); cursor: text; }
 
+  .transcript-textarea {
+    width: 100%;
+    background: #131311;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 20px 24px;
+    font-family: var(--font-serif);
+    font-size: 19px;
+    line-height: 1.85;
+    color: var(--text-primary);
+    letter-spacing: 0.005em;
+    resize: none;
+    outline: none;
+    min-height: 320px;
+    transition: border-color 0.2s;
+  }
+  .transcript-textarea:focus { border-color: var(--accent-dim); }
+
   .word-low {
     background: var(--low-confidence-bg);
     color: var(--low-confidence-text);
@@ -1230,7 +1248,7 @@ export default function App() {
   const commitAllPending = () => {
     // Sync any live DOM edits first before committing
     if (editMode && transcriptRef.current) {
-      const liveText = transcriptRef.current.innerText.trim();
+      const liveText = (transcriptRef.current.value || transcriptRef.current.innerText || "").trim();
       const liveWords = liveText.split(/\s+/).filter(Boolean);
       setWords((prev) => {
         const synced = prev.map((w, i) => ({
@@ -1278,23 +1296,29 @@ export default function App() {
   // ── Sync contentEditable edits back to words array ──
   const syncEditsToWords = () => {
     if (!transcriptRef.current) return;
-    const liveText = transcriptRef.current.innerText.trim();
+    const liveText = (transcriptRef.current.value || transcriptRef.current.innerText || "").trim();
     if (!liveText) return;
     const liveWords = liveText.split(/\s+/).filter(Boolean);
     setWords((prev) => {
-      // Match live words back to original word slots by index
-      // Preserve confidence/committed/flagged metadata
       const next = prev.map((w, i) => ({
         ...w,
         text: liveWords[i] !== undefined ? liveWords[i] : w.text,
       }));
-      return next;
+      // If edited text has fewer words, trim; if more, append plainly
+      if (liveWords.length > prev.length) {
+        for (let i = prev.length; i < liveWords.length; i++) {
+          next.push({ text: liveWords[i], confidence: null, committed: false, flagged: false });
+        }
+      }
+      return next.slice(0, Math.max(liveWords.length, 1));
     });
   };
 
   // ── Copy / share ──
   const getFullText = () => {
-    if (transcriptRef.current) return transcriptRef.current.innerText.trim();
+    if (transcriptRef.current) {
+      return (transcriptRef.current.value || transcriptRef.current.innerText || "").trim();
+    }
     return words.map((w) => w.text).join(" ");
   };
 
@@ -1747,19 +1771,23 @@ export default function App() {
               </div>
             )}
 
-            <div
-              key={allCommitted ? "committed" : "live"}
-              ref={transcriptRef}
-              className={`transcript-body ${editMode ? "edit-active" : ""}`}
-              contentEditable={editMode}
-              suppressContentEditableWarning={true}
-              spellCheck={editMode}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") e.preventDefault();
-              }}
-            >
-              {renderTranscript()}
-            </div>
+            {editMode ? (
+              <textarea
+                ref={transcriptRef}
+                className="transcript-body transcript-textarea"
+                defaultValue={words.map((w) => w.text).join(" ")}
+                spellCheck={true}
+                autoFocus
+              />
+            ) : (
+              <div
+                key={allCommitted ? "committed" : "live"}
+                ref={transcriptRef}
+                className="transcript-body"
+              >
+                {renderTranscript()}
+              </div>
+            )}
 
             <Toolbar isBottom={true} />
           </div>
