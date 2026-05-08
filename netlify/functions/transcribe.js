@@ -51,7 +51,7 @@ exports.handler = async function (event) {
 
     if (action === "poll") {
       const { id } = payload;
-      const res = await fetch(`https://api.assemblyai.com/v2/transcript/${id}`, {
+      const res = await fetch("https://api.assemblyai.com/v2/transcript/" + id, {
         headers: { authorization: API_KEY },
       });
       const data = await res.json();
