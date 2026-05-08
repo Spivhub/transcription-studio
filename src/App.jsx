@@ -1274,12 +1274,12 @@ export default function App() {
   };
 
   const downloadPdf = () => {
-    const text = getFullText();
+    const raw = getFullText();
     const maxChars = 90;
-    const wordList = text.split(" ");
+    const wordArr = raw.split(" ");
     const lines = [];
     let cur = "";
-    wordList.forEach((w) => {
+    wordArr.forEach((w) => {
       const t = cur ? cur + " " + w : w;
       if (t.length > maxChars && cur) { lines.push(cur); cur = w; }
       else cur = t;
@@ -1303,27 +1303,25 @@ export default function App() {
     const ln = (s) => { out.push(s); pos += s.length + 1; };
 
     ln("%PDF-1.4");
-
     offsets[1] = pos;
     ln("1 0 obj");
     ln("<< /Type /Font /Subtype /Type1 /BaseFont /Times-Roman /Encoding /WinAnsiEncoding >>");
     ln("endobj");
 
     const base = 3;
-    const streamNums = [];
     const pageNums = [];
 
     pages.forEach((pg, pi) => {
       const sn = base + pi * 2;
       const pn = base + pi * 2 + 1;
       const ty = ph - my;
-      let s = "BT\n/F1 " + fs + " Tf\n" + mx + " " + ty + " Td\n" + lead + " TL\n";
-      pg.forEach((line) => {
-        const safe = line.replace(/\/g, "\\").replace(/\(/g, "\(").replace(/\)/g, "\)");
-        s += "(" + safe + ") Tj T*" + "
-";
-      });
-      s += "ET";
+      const header = "BT" + "\n" + "/F1 " + fs + " Tf" + "\n" + mx + " " + ty + " Td" + "\n" + lead + " TL" + "\n";
+      const body = pg.map((line) => {
+        const safe = line.split("").filter((c) => c.charCodeAt(0) < 128 && c !== "(" && c !== ")" && c !== "\\").join("");
+        return "(" + safe + ") Tj T*" + "\n";
+      }).join("");
+      const s = header + body + "ET";
+
       offsets[sn] = pos;
       ln(sn + " 0 obj");
       ln("<< /Length " + s.length + " >>");
@@ -1331,7 +1329,6 @@ export default function App() {
       ln(s);
       ln("endstream");
       ln("endobj");
-      streamNums.push(sn);
 
       offsets[pn] = pos;
       ln(pn + " 0 obj");
@@ -1365,8 +1362,7 @@ export default function App() {
     ln(String(xref));
     ln("%%EOF");
 
-    const blob = new Blob([out.join("
-")], { type: "application/pdf" });
+    const blob = new Blob([out.join("\n")], { type: "application/pdf" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
