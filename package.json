@@ -10,7 +10,11 @@
   "dependencies": {
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
-    "@supabase/supabase-js": "^2.39.0"
+    "@supabase/supabase-js": "^2.39.0",
+    "@tiptap/react": "^2.4.0",
+    "@tiptap/pm": "^2.4.0",
+    "@tiptap/starter-kit": "^2.4.0",
+    "@tiptap/extension-highlight": "^2.4.0"
   },
   "devDependencies": {
     "@vitejs/plugin-react": "^4.2.0",
