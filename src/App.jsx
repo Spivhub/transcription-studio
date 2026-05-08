@@ -732,39 +732,26 @@ const STYLES = `
     position: relative;
   }
 
-  .transcript-wrapper.edit-active {
+  .transcript-edit-textarea {
+    width: 100%;
+    background: #131311;
     border: 1px solid var(--border);
     border-radius: 6px;
-    background: #131311;
-  }
-
-  .transcript-overlay-textarea {
-    position: absolute;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    min-height: 100%;
-    background: transparent;
-    border: none;
-    outline: none;
-    resize: none;
+    padding: 20px 24px;
     font-family: var(--font-serif);
     font-size: 19px;
     line-height: 1.85;
-    color: transparent;
-    caret-color: var(--text-primary);
+    color: var(--text-primary);
     letter-spacing: 0.005em;
-    padding: 4px;
+    outline: none;
+    resize: none;
+    caret-color: var(--text-primary);
+    display: block;
     overflow: hidden;
-    z-index: 2;
-    cursor: text;
+    min-height: 200px;
+    transition: border-color 0.2s;
   }
-
-  .transcript-overlay-textarea::selection {
-    background: rgba(196, 168, 114, 0.3);
-    color: transparent;
-  }
+  .transcript-edit-textarea:focus { border-color: var(--accent-dim); }
 
   .word-low {
     background: var(--low-confidence-bg);
@@ -1059,11 +1046,13 @@ export default function App() {
     };
   }, []);
 
-  // ── Auto-size overlay textarea when edit mode opens ──
+  // ── Auto-size textarea when edit mode opens ──
   useEffect(() => {
     if (editMode && editTextareaRef.current) {
-      editTextareaRef.current.style.height = "auto";
-      editTextareaRef.current.style.height = editTextareaRef.current.scrollHeight + "px";
+      const el = editTextareaRef.current;
+      el.style.height = "auto";
+      el.style.height = el.scrollHeight + "px";
+      el.focus();
     }
   }, [editMode]);
 
@@ -1809,27 +1798,27 @@ export default function App() {
               </div>
             )}
 
-            <div className={`transcript-wrapper ${editMode ? "edit-active" : ""}`} ref={transcriptRef}>
+            {editMode ? (
+              <textarea
+                ref={editTextareaRef}
+                className="transcript-edit-textarea"
+                defaultValue={words.map((w) => w.text).join(" ")}
+                spellCheck={true}
+                autoFocus
+                onInput={(e) => {
+                  e.target.style.height = "auto";
+                  e.target.style.height = e.target.scrollHeight + "px";
+                }}
+              />
+            ) : (
               <div
                 key={allCommitted ? "committed" : "live"}
+                ref={transcriptRef}
                 className="transcript-body"
               >
                 {renderTranscript()}
               </div>
-              {editMode && (
-                <textarea
-                  ref={editTextareaRef}
-                  className="transcript-overlay-textarea"
-                  defaultValue={words.map((w) => w.text).join(" ")}
-                  spellCheck={true}
-                  autoFocus
-                  onInput={(e) => {
-                    e.target.style.height = "auto";
-                    e.target.style.height = e.target.scrollHeight + "px";
-                  }}
-                />
-              )}
-            </div>
+            )}
 
             <Toolbar isBottom={true} />
           </div>
