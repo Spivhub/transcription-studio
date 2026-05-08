@@ -1240,14 +1240,18 @@ export default function App() {
   };
 
   const restoreHighlights = () => {
-    // Restore original confidence/committed state but keep any text edits the user made
+    // Only un-commit words that were originally low-confidence
+    // Never touch word.text - preserve all user edits
     setWords((prev) =>
-      prev.map((w, i) => ({
-        ...w,
-        committed: false,
-        flagged: false,
-        confidence: originalWords[i] ? originalWords[i].confidence : w.confidence,
-      }))
+      prev.map((w, i) => {
+        const orig = originalWords[i];
+        const wasLowConf = orig && orig.confidence !== null && orig.confidence < CONFIDENCE_THRESHOLD;
+        return {
+          ...w,
+          committed: wasLowConf ? false : w.committed,
+          flagged: wasLowConf ? false : w.flagged,
+        };
+      })
     );
     setAllCommitted(false);
     setPendingEdits({});
