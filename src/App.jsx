@@ -5,6 +5,28 @@ const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
 const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
+const CONFIDENCE_THRESHOLD = 0.75;
+const SMS_CHAR_LIMIT = 1600;
+const API = "/.netlify/functions/transcribe";
+
+// ── Helpers ──────────────────────────────────────────────────────────────────
+function formatBytes(b) {
+  if (b < 1024) return b + " B";
+  if (b < 1048576) return (b / 1024).toFixed(1) + " KB";
+  return (b / 1048576).toFixed(1) + " MB";
+}
+function formatDuration(ms) {
+  const s = Math.round(ms / 1000);
+  const m = Math.floor(s / 60);
+  return m > 0 ? m + "m " + (s % 60) + "s" : s + "s";
+}
+function formatDate(iso) {
+  const d = new Date(iso);
+  return d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) +
+    " · " + d.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
+}
+
+// ── Styles ───────────────────────────────────────────────────────────────────
 const STYLES = `
   @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,500;0,600;1,400;1,500&family=Playfair+Display+SC:wght@400;600&display=swap');
 
@@ -21,11 +43,11 @@ const STYLES = `
     --text-muted: #c0bab0;
     --accent: #f0ddb8;
     --accent-dim: #c4a872;
-    --low-confidence-bg: #2e2b24;
-    --low-confidence-border: #7a6e58;
-    --low-confidence-text: #f0c070;
+    --low-bg: #2e2b24;
+    --low-border: #7a6e58;
+    --low-text: #f0c070;
     --font-serif: 'Playfair Display', Georgia, serif;
-    --font-serif-sc: 'Playfair Display SC', Georgia, serif;
+    --font-sc: 'Playfair Display SC', Georgia, serif;
   }
 
   body {
@@ -45,7 +67,7 @@ const STYLES = `
     flex-direction: column;
   }
 
-  /* ── Header ── */
+  /* Header */
   .header {
     padding: 52px 0 40px;
     border-bottom: 1px solid var(--border-subtle);
@@ -54,38 +76,30 @@ const STYLES = `
     justify-content: space-between;
     align-items: flex-start;
   }
-
   .header-left { flex: 1; }
-
   .header-eyebrow {
-    font-family: var(--font-serif-sc);
+    font-family: var(--font-sc);
     font-size: 10px;
     letter-spacing: 0.25em;
     color: var(--text-muted);
     text-transform: uppercase;
     margin-bottom: 14px;
   }
-
   .header-title {
     font-size: 32px;
     font-weight: 400;
-    color: var(--text-primary);
     line-height: 1.15;
     letter-spacing: -0.02em;
     margin-bottom: 10px;
   }
-
   .header-title em { font-style: italic; color: var(--accent); }
-
   .header-sub {
     font-size: 14px;
     color: var(--text-secondary);
-    font-weight: 400;
     line-height: 1.6;
     font-style: italic;
     max-width: 480px;
   }
-
   .header-right {
     display: flex;
     align-items: center;
@@ -93,7 +107,7 @@ const STYLES = `
     padding-top: 8px;
   }
 
-  /* ── Hamburger / Sessions ── */
+  /* Hamburger */
   .hamburger-btn {
     background: none;
     border: 1px solid var(--border-subtle);
@@ -106,20 +120,19 @@ const STYLES = `
     flex-direction: column;
     gap: 4px;
   }
-
   .hamburger-btn:hover { border-color: var(--accent-dim); color: var(--accent); }
-  .hamburger-btn span {
-    display: block;
-    width: 18px;
-    height: 1px;
-    background: currentColor;
-    transition: background 0.2s;
-  }
+  .hamburger-btn span { display: block; width: 18px; height: 1px; background: currentColor; }
 
+  /* Drawer */
+  .drawer-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.4);
+    z-index: 199;
+  }
   .sessions-drawer {
     position: fixed;
-    top: 0;
-    right: 0;
+    top: 0; right: 0;
     width: 340px;
     height: 100vh;
     background: #141412;
@@ -131,9 +144,7 @@ const STYLES = `
     transition: transform 0.3s ease;
     box-shadow: -8px 0 32px rgba(0,0,0,0.4);
   }
-
   .sessions-drawer.open { transform: translateX(0); }
-
   .drawer-header {
     padding: 28px 24px 20px;
     border-bottom: 1px solid var(--border-subtle);
@@ -141,15 +152,13 @@ const STYLES = `
     justify-content: space-between;
     align-items: center;
   }
-
   .drawer-title {
-    font-family: var(--font-serif-sc);
+    font-family: var(--font-sc);
     font-size: 10px;
     letter-spacing: 0.25em;
     color: var(--text-muted);
     text-transform: uppercase;
   }
-
   .drawer-close {
     background: none;
     border: none;
@@ -161,13 +170,7 @@ const STYLES = `
     font-family: var(--font-serif);
   }
   .drawer-close:hover { color: var(--text-primary); }
-
-  .drawer-body {
-    flex: 1;
-    overflow-y: auto;
-    padding: 16px;
-  }
-
+  .drawer-body { flex: 1; overflow-y: auto; padding: 16px; }
   .session-card {
     background: var(--bg-card);
     border: 1px solid var(--border-subtle);
@@ -177,19 +180,13 @@ const STYLES = `
     cursor: pointer;
     transition: all 0.15s;
   }
-
-  .session-card:hover {
-    border-color: var(--accent-dim);
-    background: #1a1916;
-  }
-
+  .session-card:hover { border-color: var(--accent-dim); background: #1a1916; }
   .session-card-header {
     display: flex;
     justify-content: space-between;
     align-items: flex-start;
     margin-bottom: 6px;
   }
-
   .session-filename {
     font-size: 13px;
     color: var(--text-primary);
@@ -197,9 +194,8 @@ const STYLES = `
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
-    max-width: 180px;
+    max-width: 200px;
   }
-
   .session-delete {
     background: none;
     border: none;
@@ -208,12 +204,10 @@ const STYLES = `
     font-size: 12px;
     padding: 2px 4px;
     transition: color 0.2s;
-    flex-shrink: 0;
   }
   .session-delete:hover { color: #c07060; }
-
   .session-meta {
-    font-family: var(--font-serif-sc);
+    font-family: var(--font-sc);
     font-size: 9px;
     letter-spacing: 0.15em;
     color: var(--text-muted);
@@ -222,7 +216,6 @@ const STYLES = `
     gap: 12px;
     flex-wrap: wrap;
   }
-
   .session-preview {
     font-size: 12px;
     color: var(--text-secondary);
@@ -234,7 +227,6 @@ const STYLES = `
     -webkit-box-orient: vertical;
     overflow: hidden;
   }
-
   .no-sessions {
     font-size: 13px;
     color: var(--text-muted);
@@ -244,14 +236,7 @@ const STYLES = `
     line-height: 1.7;
   }
 
-  .drawer-overlay {
-    position: fixed;
-    inset: 0;
-    background: rgba(0,0,0,0.4);
-    z-index: 199;
-  }
-
-  /* ── Auth ── */
+  /* Auth */
   .auth-section {
     margin-bottom: 40px;
     background: var(--bg-card);
@@ -259,29 +244,25 @@ const STYLES = `
     border-radius: 6px;
     padding: 28px 32px;
   }
-
   .auth-title {
-    font-family: var(--font-serif-sc);
+    font-family: var(--font-sc);
     font-size: 10px;
     letter-spacing: 0.2em;
     color: var(--text-muted);
     text-transform: uppercase;
     margin-bottom: 20px;
   }
-
   .auth-tabs {
     display: flex;
-    gap: 0;
     margin-bottom: 24px;
     border-bottom: 1px solid var(--border-subtle);
   }
-
   .auth-tab {
     background: none;
     border: none;
     border-bottom: 2px solid transparent;
     padding: 8px 20px 10px;
-    font-family: var(--font-serif-sc);
+    font-family: var(--font-sc);
     font-size: 9px;
     letter-spacing: 0.2em;
     color: var(--text-muted);
@@ -290,18 +271,10 @@ const STYLES = `
     transition: all 0.2s;
     margin-bottom: -1px;
   }
-
-  .auth-tab.active {
-    color: var(--accent);
-    border-bottom-color: var(--accent-dim);
-  }
-
-  .auth-field {
-    margin-bottom: 14px;
-  }
-
+  .auth-tab.active { color: var(--accent); border-bottom-color: var(--accent-dim); }
+  .auth-field { margin-bottom: 14px; }
   .field-label {
-    font-family: var(--font-serif-sc);
+    font-family: var(--font-sc);
     font-size: 9px;
     letter-spacing: 0.2em;
     color: var(--text-muted);
@@ -309,7 +282,6 @@ const STYLES = `
     display: block;
     margin-bottom: 8px;
   }
-
   .auth-input {
     width: 100%;
     background: var(--bg);
@@ -322,17 +294,15 @@ const STYLES = `
     outline: none;
     transition: border-color 0.2s;
   }
-
   .auth-input:focus { border-color: var(--accent-dim); }
   .auth-input::placeholder { color: var(--text-muted); }
-
   .auth-btn {
     width: 100%;
     background: var(--bg-elevated);
     border: 1px solid var(--accent-dim);
     border-radius: 4px;
     padding: 12px 24px;
-    font-family: var(--font-serif-sc);
+    font-family: var(--font-sc);
     font-size: 10px;
     letter-spacing: 0.22em;
     color: var(--accent);
@@ -341,22 +311,9 @@ const STYLES = `
     transition: all 0.2s;
     margin-top: 8px;
   }
-
-  .auth-btn:hover:not(:disabled) {
-    background: #201f1c;
-    border-color: var(--accent);
-    color: var(--text-primary);
-  }
-
+  .auth-btn:hover:not(:disabled) { background: #201f1c; border-color: var(--accent); color: var(--text-primary); }
   .auth-btn:disabled { opacity: 0.4; cursor: not-allowed; }
-
-  .auth-error {
-    font-size: 12px;
-    color: #c07060;
-    font-style: italic;
-    margin-top: 10px;
-  }
-
+  .auth-error { font-size: 12px; color: #c07060; font-style: italic; margin-top: 10px; }
   .auth-skip {
     background: none;
     border: none;
@@ -372,29 +329,21 @@ const STYLES = `
     transition: color 0.2s;
   }
   .auth-skip:hover { color: var(--text-secondary); }
-
   .user-pill {
     display: flex;
     align-items: center;
     gap: 8px;
-    font-family: var(--font-serif-sc);
+    font-family: var(--font-sc);
     font-size: 9px;
     letter-spacing: 0.15em;
     color: var(--text-muted);
     text-transform: uppercase;
   }
-
-  .user-pill-dot {
-    width: 6px;
-    height: 6px;
-    border-radius: 50%;
-    background: #6a9a6a;
-  }
-
+  .user-pill-dot { width: 6px; height: 6px; border-radius: 50%; background: #6a9a6a; }
   .signout-btn {
     background: none;
     border: none;
-    font-family: var(--font-serif-sc);
+    font-family: var(--font-sc);
     font-size: 9px;
     letter-spacing: 0.15em;
     color: var(--text-muted);
@@ -405,7 +354,7 @@ const STYLES = `
   }
   .signout-btn:hover { color: var(--text-secondary); }
 
-  /* ── Drop zone ── */
+  /* Drop zone */
   .drop-zone {
     border: 1px dashed var(--border);
     border-radius: 6px;
@@ -414,36 +363,22 @@ const STYLES = `
     cursor: pointer;
     transition: all 0.25s ease;
     background: var(--bg-card);
-    position: relative;
     margin-bottom: 40px;
   }
-
-  .drop-zone:hover, .drop-zone.dragging {
-    border-color: var(--accent-dim);
-    background: #181816;
-  }
-
+  .drop-zone:hover, .drop-zone.dragging { border-color: var(--accent-dim); background: #181816; }
   .drop-icon { font-size: 28px; margin-bottom: 16px; opacity: 0.6; display: block; }
-
-  .drop-title {
-    font-size: 17px;
-    font-weight: 500;
-    color: var(--text-primary);
-    margin-bottom: 8px;
-    letter-spacing: -0.01em;
-  }
-
+  .drop-title { font-size: 17px; font-weight: 500; margin-bottom: 8px; letter-spacing: -0.01em; }
   .drop-sub { font-size: 13px; color: var(--text-muted); font-style: italic; line-height: 1.6; }
-
   .drop-formats {
     margin-top: 18px;
-    font-family: var(--font-serif-sc);
+    font-family: var(--font-sc);
     font-size: 9px;
     letter-spacing: 0.2em;
     color: var(--text-muted);
     text-transform: uppercase;
   }
 
+  /* File selected */
   .file-selected {
     display: flex;
     align-items: center;
@@ -454,22 +389,17 @@ const STYLES = `
     padding: 18px 22px;
     margin-bottom: 28px;
   }
-
   .file-icon { font-size: 22px; opacity: 0.6; }
   .file-info { flex: 1; min-width: 0; }
-
   .file-name {
     font-size: 14px;
-    color: var(--text-primary);
     font-weight: 500;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
     margin-bottom: 3px;
   }
-
   .file-size { font-size: 12px; color: var(--text-muted); font-style: italic; }
-
   .file-clear {
     background: none;
     border: none;
@@ -482,13 +412,14 @@ const STYLES = `
   }
   .file-clear:hover { color: var(--text-primary); }
 
+  /* Transcribe button */
   .transcribe-btn {
     width: 100%;
     background: var(--bg-elevated);
     border: 1px solid var(--accent-dim);
     border-radius: 4px;
     padding: 15px 24px;
-    font-family: var(--font-serif-sc);
+    font-family: var(--font-sc);
     font-size: 11px;
     letter-spacing: 0.25em;
     color: var(--accent);
@@ -497,20 +428,13 @@ const STYLES = `
     transition: all 0.2s;
     margin-bottom: 52px;
   }
-
-  .transcribe-btn:hover:not(:disabled) {
-    background: #201f1c;
-    border-color: var(--accent);
-    color: var(--text-primary);
-  }
-
+  .transcribe-btn:hover:not(:disabled) { background: #201f1c; border-color: var(--accent); color: var(--text-primary); }
   .transcribe-btn:disabled { opacity: 0.35; cursor: not-allowed; }
 
-  /* ── Progress ── */
+  /* Progress */
   .progress-section { margin-bottom: 40px; }
-
   .progress-label {
-    font-family: var(--font-serif-sc);
+    font-family: var(--font-sc);
     font-size: 10px;
     letter-spacing: 0.2em;
     color: var(--text-muted);
@@ -519,27 +443,12 @@ const STYLES = `
     display: flex;
     justify-content: space-between;
   }
-
-  .progress-bar-track {
-    height: 1px;
-    background: var(--border);
-    border-radius: 1px;
-    overflow: hidden;
-    margin-bottom: 12px;
-  }
-
-  .progress-bar-fill {
-    height: 100%;
-    background: var(--accent-dim);
-    border-radius: 1px;
-    transition: width 0.4s ease;
-  }
-
+  .progress-bar-track { height: 1px; background: var(--border); border-radius: 1px; overflow: hidden; margin-bottom: 12px; }
+  .progress-bar-fill { height: 100%; background: var(--accent-dim); border-radius: 1px; transition: width 0.4s ease; }
   .progress-status { font-size: 13px; color: var(--text-secondary); font-style: italic; }
 
-  /* ── Transcript ── */
+  /* Transcript */
   .transcript-section { margin-bottom: 80px; }
-
   .transcript-header {
     display: flex;
     align-items: center;
@@ -550,34 +459,23 @@ const STYLES = `
     flex-wrap: wrap;
     gap: 12px;
   }
-
   .transcript-title {
-    font-family: var(--font-serif-sc);
+    font-family: var(--font-sc);
     font-size: 10px;
     letter-spacing: 0.25em;
     color: var(--text-muted);
     text-transform: uppercase;
   }
-
-  .legend-item {
-    display: flex;
-    align-items: center;
-    gap: 7px;
-    font-size: 11px;
-    color: var(--text-muted);
-    font-style: italic;
-  }
-
+  .legend-item { display: flex; align-items: center; gap: 7px; font-size: 11px; color: var(--text-muted); font-style: italic; }
   .legend-swatch {
-    width: 22px;
-    height: 10px;
-    background: var(--low-confidence-bg);
-    border: 1px solid var(--low-confidence-border);
+    width: 22px; height: 10px;
+    background: var(--low-bg);
+    border: 1px solid var(--low-border);
     border-radius: 2px;
     display: inline-block;
   }
 
-  /* ── Toolbar ── */
+  /* Toolbar */
   .toolbar {
     display: flex;
     align-items: center;
@@ -591,17 +489,15 @@ const STYLES = `
     padding: 12px 4px;
     border-bottom: 1px solid var(--border-subtle);
   }
-
   .toolbar-bottom {
     margin-top: 28px;
-    margin-bottom: 0;
     padding-top: 20px;
     border-top: 1px solid var(--border-subtle);
     position: static;
     border-bottom: none;
     padding-bottom: 0;
+    margin-bottom: 0;
   }
-
   .tool-btn {
     display: flex;
     align-items: center;
@@ -610,7 +506,7 @@ const STYLES = `
     border: 1px solid var(--border);
     border-radius: 4px;
     padding: 8px 14px;
-    font-family: var(--font-serif-sc);
+    font-family: var(--font-sc);
     font-size: 9px;
     letter-spacing: 0.18em;
     color: var(--text-secondary);
@@ -619,16 +515,14 @@ const STYLES = `
     transition: all 0.2s;
     white-space: nowrap;
   }
-
   .tool-btn:hover { border-color: var(--accent-dim); color: var(--accent); }
   .tool-btn.active { border-color: var(--accent-dim); color: var(--accent); background: #1e1c18; }
   .tool-btn.commit-btn { border-color: #5a8a5a; color: #90c090; }
   .tool-btn.commit-btn:hover { border-color: #80b080; color: #b0d8b0; background: #161e16; }
   .tool-icon { font-size: 13px; }
 
-  /* ── Share ── */
+  /* Share */
   .share-wrapper { position: relative; }
-
   .share-menu {
     position: absolute;
     top: calc(100% + 6px);
@@ -641,7 +535,6 @@ const STYLES = `
     min-width: 190px;
     box-shadow: 0 8px 32px rgba(0,0,0,0.5);
   }
-
   .share-item {
     display: flex;
     align-items: center;
@@ -651,7 +544,7 @@ const STYLES = `
     border: none;
     border-radius: 3px;
     padding: 9px 12px;
-    font-family: var(--font-serif-sc);
+    font-family: var(--font-sc);
     font-size: 9px;
     letter-spacing: 0.18em;
     color: var(--text-secondary);
@@ -661,10 +554,10 @@ const STYLES = `
     transition: all 0.15s;
     white-space: nowrap;
   }
-
   .share-item:hover { background: #2a2826; color: var(--accent); }
   .share-icon { font-size: 13px; width: 18px; text-align: center; }
 
+  /* SMS warning */
   .sms-warning {
     background: #1e1a14;
     border: 1px solid #5a4a20;
@@ -677,7 +570,7 @@ const STYLES = `
     line-height: 1.5;
   }
 
-  /* ── Stats ── */
+  /* Stats */
   .stats-row {
     display: flex;
     gap: 32px;
@@ -686,25 +579,11 @@ const STYLES = `
     border-top: 1px solid var(--border-subtle);
     border-bottom: 1px solid var(--border-subtle);
   }
-
   .stat { display: flex; flex-direction: column; gap: 4px; }
+  .stat-value { font-size: 22px; font-weight: 500; letter-spacing: -0.02em; }
+  .stat-label { font-family: var(--font-sc); font-size: 9px; letter-spacing: 0.2em; color: var(--text-muted); text-transform: uppercase; }
 
-  .stat-value {
-    font-size: 22px;
-    font-weight: 500;
-    color: var(--text-primary);
-    letter-spacing: -0.02em;
-  }
-
-  .stat-label {
-    font-family: var(--font-serif-sc);
-    font-size: 9px;
-    letter-spacing: 0.2em;
-    color: var(--text-muted);
-    text-transform: uppercase;
-  }
-
-  /* ── Words ── */
+  /* Transcript body */
   .transcript-body {
     font-size: 19px;
     line-height: 1.85;
@@ -714,73 +593,51 @@ const STYLES = `
     border: 1px solid transparent;
     border-radius: 6px;
     padding: 4px;
-    transition: border-color 0.25s, background 0.25s, padding 0.25s;
-    outline: none;
+    transition: border-color 0.25s, background 0.25s;
   }
-
   .transcript-body.edit-active {
     border-color: var(--border);
     background: #131311;
     padding: 20px 24px;
-    cursor: text;
-  }
-
-  .word { display: inline; }
-  .word-normal { color: var(--text-primary); cursor: text; }
-
-  .transcript-wrapper {
-    position: relative;
-  }
-
-  .transcript-wrapper.edit-active {
-    border: 1px solid var(--border);
-    border-radius: 6px;
-    background: #131311;
-  }
-
-  .transcript-overlay-textarea {
-    position: absolute;
-    top: 0;
-    left: 0;
     width: 100%;
-    height: 100%;
-    min-height: 100%;
-    background: transparent;
-    border: none;
+    min-height: 200px;
     outline: none;
     resize: none;
     font-family: var(--font-serif);
-    font-size: 19px;
-    line-height: 1.85;
-    color: transparent;
     caret-color: var(--text-primary);
-    letter-spacing: 0.005em;
-    padding: 4px;
-    overflow: hidden;
-    z-index: 2;
     cursor: text;
   }
-
-  .transcript-overlay-textarea::selection {
-    background: rgba(196, 168, 114, 0.3);
-    color: transparent;
+  textarea.transcript-body {
+    display: block;
+    font-family: var(--font-serif);
+    color: var(--text-primary);
+    background: #131311;
+    border-color: var(--border);
+    padding: 20px 24px;
+    width: 100%;
+    min-height: 200px;
+    outline: none;
+    resize: none;
+    caret-color: var(--text-primary);
   }
+  textarea.transcript-body:focus { border-color: var(--accent-dim); }
 
+  /* Words */
+  .word { display: inline; }
+  .word-normal { color: var(--text-primary); }
   .word-low {
-    background: var(--low-confidence-bg);
-    color: var(--low-confidence-text);
-    border-bottom: 1px solid var(--low-confidence-border);
+    background: var(--low-bg);
+    color: var(--low-text);
+    border-bottom: 1px solid var(--low-border);
     border-radius: 2px;
     padding: 0 2px;
     cursor: pointer;
     position: relative;
     transition: background 0.15s;
   }
-
   .word-low:hover { background: #322e28; }
   .word-low.pending { background: #2a3828; border-bottom-color: #6a9a6a; color: #b0d890; }
-  .word-low.flagged { background: #2e2b24; border-bottom-color: #c4a872; color: #f0c070; }
-
+  .word-low.flagged { background: var(--low-bg); border-bottom-color: var(--accent-dim); color: var(--low-text); }
   .word-input {
     background: #1e2a1e;
     border: none;
@@ -795,7 +652,6 @@ const STYLES = `
     padding: 0 2px;
     min-width: 20px;
   }
-
   .confidence-tip {
     position: absolute;
     bottom: calc(100% + 6px);
@@ -805,7 +661,7 @@ const STYLES = `
     border: 1px solid var(--border);
     border-radius: 3px;
     padding: 4px 8px;
-    font-family: var(--font-serif-sc);
+    font-family: var(--font-sc);
     font-size: 9px;
     letter-spacing: 0.15em;
     color: var(--text-muted);
@@ -813,7 +669,6 @@ const STYLES = `
     pointer-events: none;
     z-index: 10;
   }
-
   .pending-bar {
     background: #1a2218;
     border: 1px solid #3a5a3a;
@@ -827,13 +682,12 @@ const STYLES = `
     align-items: center;
     justify-content: space-between;
   }
-
   .commit-inline-btn {
     background: none;
     border: 1px solid #5a8a5a;
     border-radius: 3px;
     padding: 4px 12px;
-    font-family: var(--font-serif-sc);
+    font-family: var(--font-sc);
     font-size: 9px;
     letter-spacing: 0.15em;
     color: #90c090;
@@ -843,7 +697,7 @@ const STYLES = `
   }
   .commit-inline-btn:hover { background: #1e2e1e; border-color: #80b080; }
 
-  /* ── Error / Footer / New ── */
+  /* Error */
   .error-box {
     background: #1e1614;
     border: 1px solid #3d2820;
@@ -856,11 +710,12 @@ const STYLES = `
     line-height: 1.6;
   }
 
+  /* Footer */
   .footer {
     margin-top: auto;
     padding: 24px 0 32px;
     border-top: 1px solid var(--border-subtle);
-    font-family: var(--font-serif-sc);
+    font-family: var(--font-sc);
     font-size: 9px;
     letter-spacing: 0.15em;
     color: var(--text-muted);
@@ -868,13 +723,12 @@ const STYLES = `
     display: flex;
     justify-content: space-between;
   }
-
   .new-btn {
     background: none;
     border: 1px solid var(--border-subtle);
     border-radius: 4px;
     padding: 10px 20px;
-    font-family: var(--font-serif-sc);
+    font-family: var(--font-sc);
     font-size: 9px;
     letter-spacing: 0.2em;
     color: var(--text-muted);
@@ -883,9 +737,8 @@ const STYLES = `
     transition: all 0.2s;
   }
   .new-btn:hover { border-color: var(--accent-dim); color: var(--accent); }
-
   .save-indicator {
-    font-family: var(--font-serif-sc);
+    font-family: var(--font-sc);
     font-size: 9px;
     letter-spacing: 0.15em;
     color: #6a9a6a;
@@ -896,37 +749,19 @@ const STYLES = `
   .save-indicator.visible { opacity: 1; }
 `;
 
-const CONFIDENCE_THRESHOLD = 0.75;
-const SMS_CHAR_LIMIT = 1600;
-const API = "/.netlify/functions/transcribe";
-
-function formatBytes(b) {
-  if (b < 1024) return b + " B";
-  if (b < 1024 * 1024) return (b / 1024).toFixed(1) + " KB";
-  return (b / (1024 * 1024)).toFixed(1) + " MB";
-}
-
-function formatDuration(ms) {
-  const s = Math.round(ms / 1000);
-  const m = Math.floor(s / 60);
-  return m > 0 ? `${m}m ${s % 60}s` : `${s}s`;
-}
-
-function formatDate(iso) {
-  const d = new Date(iso);
-  return d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) +
-    " · " + d.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
-}
-
-// ── Word component - clean input-based editing, no contentEditable ──
+// ── Word Component ────────────────────────────────────────────────────────────
 function Word({ word, index, onEdit, onPendingChange, onFlag }) {
   const [editing, setEditing] = useState(false);
   const [hovered, setHovered] = useState(false);
   const [val, setVal] = useState(word.text);
   const inputRef = useRef(null);
-  const isLow = (word.confidence !== null && word.confidence < CONFIDENCE_THRESHOLD && !word.committed) || word.flagged;
 
   useEffect(() => { setVal(word.text); }, [word.text]);
+
+  const isLow = (
+    (word.confidence !== null && word.confidence < CONFIDENCE_THRESHOLD && !word.committed)
+    || word.flagged
+  );
 
   const startEdit = () => {
     setEditing(true);
@@ -945,10 +780,7 @@ function Word({ word, index, onEdit, onPendingChange, onFlag }) {
     if (e.key === "Escape") { setVal(word.text); finishEdit(false); }
   };
 
-  const handleContextMenu = (e) => {
-    e.preventDefault();
-    onFlag(index);
-  };
+  const handleContextMenu = (e) => { e.preventDefault(); onFlag(index); };
 
   if (word.committed && !word.flagged) {
     return <span className="word word-normal" onContextMenu={handleContextMenu}>{word.text}</span>;
@@ -957,14 +789,17 @@ function Word({ word, index, onEdit, onPendingChange, onFlag }) {
   if (isLow) {
     return (
       <span
-        className={`word word-low ${editing ? "pending" : ""} ${word.flagged ? "flagged" : ""}`}
+        className={"word word-low" + (editing ? " pending" : "") + (word.flagged ? " flagged" : "")}
         onMouseEnter={() => setHovered(true)}
         onMouseLeave={() => setHovered(false)}
         onContextMenu={handleContextMenu}
       >
         {hovered && !editing && (
           <span className="confidence-tip">
-            {word.flagged ? "Manually flagged — click to edit, right-click to unflag" : Math.round(word.confidence * 100) + "% — click to edit"}
+            {word.flagged
+              ? "Manually flagged — click to edit, right-click to unflag"
+              : Math.round(word.confidence * 100) + "% — click to edit"
+            }
           </span>
         )}
         {editing ? (
@@ -979,15 +814,7 @@ function Word({ word, index, onEdit, onPendingChange, onFlag }) {
               size={Math.max(val.length, 3)}
             />
             <span
-              style={{
-                fontSize: "10px",
-                marginLeft: "4px",
-                cursor: "pointer",
-                fontFamily: "var(--font-serif-sc)",
-                letterSpacing: "0.1em",
-                color: "#90c090",
-                textTransform: "uppercase",
-              }}
+              style={{ fontSize: "10px", marginLeft: "4px", cursor: "pointer", fontFamily: "var(--font-sc)", letterSpacing: "0.1em", color: "#90c090", textTransform: "uppercase" }}
               onMouseDown={(e) => { e.preventDefault(); finishEdit(true); }}
             >commit</span>
           </>
@@ -1001,8 +828,9 @@ function Word({ word, index, onEdit, onPendingChange, onFlag }) {
   return <span className="word word-normal" onContextMenu={handleContextMenu}>{word.text}</span>;
 }
 
-// ── Main App ──
+// ── App ───────────────────────────────────────────────────────────────────────
 export default function App() {
+  // Auth
   const [user, setUser] = useState(null);
   const [authChecked, setAuthChecked] = useState(false);
   const [authMode, setAuthMode] = useState("signin");
@@ -1012,62 +840,40 @@ export default function App() {
   const [authLoading, setAuthLoading] = useState(false);
   const [authSkipped, setAuthSkipped] = useState(false);
 
+  // File / transcription
   const [file, setFile] = useState(null);
   const [dragging, setDragging] = useState(false);
   const [status, setStatus] = useState("idle");
   const [progress, setProgress] = useState(0);
   const [progressLabel, setProgressLabel] = useState("");
-  const [words, setWords] = useState([]);
-  const [audioDuration, setAudioDuration] = useState(null);
   const [error, setError] = useState(null);
 
+  // Words
+  const [words, setWords] = useState([]);
+  const [originalWords, setOriginalWords] = useState([]);
+  const [audioDuration, setAudioDuration] = useState(null);
+  const [pendingEdits, setPendingEdits] = useState({});
+
+  // Edit mode - textarea based, real-time
+  const [editMode, setEditMode] = useState(false);
+  const [editText, setEditText] = useState("");
+
+  // UI state
   const [copiedTop, setCopiedTop] = useState(false);
   const [copiedBottom, setCopiedBottom] = useState(false);
   const [shareOpen, setShareOpen] = useState(false);
   const [shareOpenBottom, setShareOpenBottom] = useState(false);
   const [showSmsWarning, setShowSmsWarning] = useState(false);
-
-  const [editMode, setEditMode] = useState(false);
-  const [allCommitted, setAllCommitted] = useState(false);
-  const [originalWords, setOriginalWords] = useState([]);
-  const [editedText, setEditedText] = useState("");
-  const [pendingEdits, setPendingEdits] = useState({});
   const [saveIndicator, setSaveIndicator] = useState(false);
-
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [sessions, setSessions] = useState([]);
   const [sessionsLoading, setSessionsLoading] = useState(false);
 
   const fileInputRef = useRef(null);
   const transcriptRef = useRef(null);
-  const editTextareaRef = useRef(null);
+  const textareaRef = useRef(null);
 
-  // ── Prevent browser from navigating on accidental drops outside drop zone ──
-  useEffect(() => {
-    const preventNav = (e) => { e.preventDefault(); };
-    const blockOutsideDrop = (e) => {
-      if (!e.target.closest(".drop-zone")) {
-        e.preventDefault();
-        e.stopPropagation();
-      }
-    };
-    document.addEventListener("dragover", preventNav);
-    document.addEventListener("drop", blockOutsideDrop);
-    return () => {
-      document.removeEventListener("dragover", preventNav);
-      document.removeEventListener("drop", blockOutsideDrop);
-    };
-  }, []);
-
-  // ── Auto-size overlay textarea when edit mode opens ──
-  useEffect(() => {
-    if (editMode && editTextareaRef.current) {
-      editTextareaRef.current.style.height = "auto";
-      editTextareaRef.current.style.height = editTextareaRef.current.scrollHeight + "px";
-    }
-  }, [editMode]);
-
-  // ── Auth init ──
+  // ── Auth ──
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       setUser(session?.user ?? null);
@@ -1079,38 +885,41 @@ export default function App() {
     return () => subscription.unsubscribe();
   }, []);
 
+  // ── Prevent browser navigation on drops outside drop zone ──
+  useEffect(() => {
+    const preventNav = (e) => { e.preventDefault(); };
+    const blockOutside = (e) => {
+      if (!e.target.closest(".drop-zone")) { e.preventDefault(); e.stopPropagation(); }
+    };
+    document.addEventListener("dragover", preventNav);
+    document.addEventListener("drop", blockOutside);
+    return () => {
+      document.removeEventListener("dragover", preventNav);
+      document.removeEventListener("drop", blockOutside);
+    };
+  }, []);
+
   // ── Auth actions ──
   const signIn = async () => {
-    setAuthLoading(true);
-    setAuthError("");
+    setAuthLoading(true); setAuthError("");
     const { error } = await supabase.auth.signInWithPassword({ email: authEmail, password: authPassword });
     if (error) setAuthError(error.message);
     setAuthLoading(false);
   };
-
   const signUp = async () => {
-    setAuthLoading(true);
-    setAuthError("");
+    setAuthLoading(true); setAuthError("");
     const { error } = await supabase.auth.signUp({ email: authEmail, password: authPassword });
     if (error) setAuthError(error.message);
-    else setAuthError("Check your email to confirm your account, then sign in.");
+    else setAuthError("Check your email to confirm, then sign in.");
     setAuthLoading(false);
   };
-
-  const signOut = async () => {
-    await supabase.auth.signOut();
-    setSessions([]);
-  };
+  const signOut = async () => { await supabase.auth.signOut(); setSessions([]); };
 
   // ── Sessions ──
   const loadSessions = async () => {
     if (!user) return;
     setSessionsLoading(true);
-    const { data } = await supabase
-      .from("sessions")
-      .select("*")
-      .order("created_at", { ascending: false })
-      .limit(50);
+    const { data } = await supabase.from("sessions").select("*").order("created_at", { ascending: false }).limit(50);
     setSessions(data || []);
     setSessionsLoading(false);
   };
@@ -1144,30 +953,23 @@ export default function App() {
     setStatus("done");
     setDrawerOpen(false);
     setPendingEdits({});
-    setAllCommitted(false);
+    setEditMode(false);
     setFile({ name: session.file_name, size: 0, restored: true });
   };
 
-  const openDrawer = () => {
-    setDrawerOpen(true);
-    loadSessions();
-  };
+  const openDrawer = () => { setDrawerOpen(true); loadSessions(); };
 
   // ── File handling ──
   const handleDrop = useCallback((e) => {
-    e.preventDefault();
-    e.stopPropagation();
+    e.preventDefault(); e.stopPropagation();
     setDragging(false);
     const f = e.dataTransfer.files[0];
     if (f) setFile(f);
   }, []);
 
-  const handleFileChange = (e) => {
-    const f = e.target.files[0];
-    if (f) setFile(f);
-  };
+  const handleFileChange = (e) => { const f = e.target.files[0]; if (f) setFile(f); };
 
-  // ── API call ──
+  // ── API ──
   const call = async (action, payload) => {
     const res = await fetch(API, {
       method: "POST",
@@ -1175,20 +977,17 @@ export default function App() {
       body: JSON.stringify({ action, payload }),
     });
     const data = await res.json();
-    if (!res.ok) throw new Error(data.error || `${action} failed`);
+    if (!res.ok) throw new Error(data.error || action + " failed");
     return data;
   };
 
   // ── Transcribe ──
   const transcribe = async () => {
     if (!file) return;
-    setError(null);
-    setWords([]);
-    setPendingEdits({});
-    setStatus("uploading");
-    setProgress(10);
+    setError(null); setWords([]); setOriginalWords([]);
+    setPendingEdits({}); setEditMode(false);
+    setStatus("uploading"); setProgress(10);
     setProgressLabel("Getting upload token...");
-
     try {
       const tokenRes = await fetch(API, {
         method: "POST",
@@ -1197,9 +996,7 @@ export default function App() {
       });
       const { key } = await tokenRes.json();
 
-      setProgress(20);
-      setProgressLabel("Uploading audio...");
-
+      setProgress(20); setProgressLabel("Uploading audio...");
       const uploadRes = await fetch("https://api.assemblyai.com/v2/upload", {
         method: "POST",
         headers: { authorization: key },
@@ -1207,29 +1004,24 @@ export default function App() {
       });
       const { upload_url } = await uploadRes.json();
 
-      setProgress(35);
-      setProgressLabel("Queuing transcription...");
-
+      setProgress(35); setProgressLabel("Queuing transcription...");
       const { id } = await call("request", { upload_url });
 
-      setStatus("processing");
-      setProgress(45);
-      setProgressLabel("Transcribing...");
+      setStatus("processing"); setProgress(45); setProgressLabel("Transcribing...");
 
       let attempts = 0;
       while (true) {
         await new Promise((r) => setTimeout(r, 2500));
         const data = await call("poll", { id });
-
         if (data.status === "completed") {
-          setProgress(100);
-          setProgressLabel("Complete");
+          setProgress(100); setProgressLabel("Complete");
           const wordList = (data.words || []).map((w) => ({
             text: w.text,
             confidence: w.confidence ?? null,
             start: w.start,
             end: w.end,
             committed: false,
+            flagged: false,
           }));
           setWords(wordList);
           setOriginalWords(wordList.map((w) => ({ ...w })));
@@ -1240,28 +1032,16 @@ export default function App() {
         } else if (data.status === "error") {
           throw new Error(data.error || "Transcription failed");
         }
-
         attempts++;
         setProgress(Math.min(45 + attempts * 4, 90));
         setProgressLabel("Transcribing" + ".".repeat((attempts % 3) + 1));
       }
     } catch (e) {
-      setError(e.message);
-      setStatus("error");
-      setProgress(0);
+      setError(e.message); setStatus("error"); setProgress(0);
     }
   };
 
-  // ── Word editing - pending system ──
-  const handlePendingChange = (index, isPending) => {
-    setPendingEdits((prev) => {
-      const next = { ...prev };
-      if (isPending) next[index] = true;
-      else delete next[index];
-      return next;
-    });
-  };
-
+  // ── Word editing ──
   const handleWordEdit = (index, newText, commit) => {
     setWords((prev) => {
       const next = [...prev];
@@ -1270,107 +1050,97 @@ export default function App() {
     });
   };
 
+  const handlePendingChange = (index, isPending) => {
+    setPendingEdits((prev) => {
+      const next = { ...prev };
+      if (isPending) next[index] = true; else delete next[index];
+      return next;
+    });
+  };
+
   const handleFlag = (index) => {
     setWords((prev) => {
       const next = [...prev];
       const w = next[index];
-      // Toggle flag - if already flagged remove it, if not flagged add it
       next[index] = { ...w, flagged: !w.flagged, committed: w.flagged ? w.committed : false };
       return next;
     });
   };
 
-  const commitAllPending = () => {
-    // Sync any live DOM edits first before committing
-    if (editMode && editTextareaRef.current) {
-      const liveText = (editTextareaRef.current.value || "").trim();
-      const liveWords = liveText.split(/\s+/).filter(Boolean);
+  // ── Edit mode ──
+  // When entering edit mode, seed textarea with current word text
+  const enterEditMode = () => {
+    setEditText(words.map((w) => w.text).join(" "));
+    setEditMode(true);
+  };
+
+  // When exiting edit mode, sync textarea back to words array
+  const exitEditMode = () => {
+    const liveWords = editText.trim().split(/\s+/).filter(Boolean);
+    setWords((prev) => {
+      const next = liveWords.map((text, i) => {
+        const existing = prev[i];
+        if (existing) return { ...existing, text };
+        return { text, confidence: null, committed: false, flagged: false };
+      });
+      return next;
+    });
+    setEditMode(false);
+  };
+
+  // ── Commit / restore ──
+  const commitAll = () => {
+    // If in edit mode, sync first
+    if (editMode) {
+      const liveWords = editText.trim().split(/\s+/).filter(Boolean);
       setWords((prev) => {
-        const synced = prev.map((w, i) => ({
-          ...w,
-          text: liveWords[i] !== undefined ? liveWords[i] : w.text,
-        }));
+        const synced = liveWords.map((text, i) => {
+          const existing = prev[i];
+          if (existing) return { ...existing, text };
+          return { text, confidence: null, committed: false, flagged: false };
+        });
         return synced.map((w) =>
-          w.confidence !== null && w.confidence < CONFIDENCE_THRESHOLD
-            ? { ...w, committed: true }
+          (w.confidence !== null && w.confidence < CONFIDENCE_THRESHOLD) || w.flagged
+            ? { ...w, committed: true, flagged: false }
             : w
         );
       });
+      setEditMode(false);
     } else {
-      setWords((prev) =>
-        prev.map((w) =>
-          w.confidence !== null && w.confidence < CONFIDENCE_THRESHOLD
-            ? { ...w, committed: true }
-            : w
-        )
-      );
+      setWords((prev) => prev.map((w) =>
+        (w.confidence !== null && w.confidence < CONFIDENCE_THRESHOLD) || w.flagged
+          ? { ...w, committed: true, flagged: false }
+          : w
+      ));
     }
     setPendingEdits({});
-    setEditMode(false);
-    setAllCommitted(true);
   };
 
   const restoreHighlights = () => {
-    // Only un-commit words that were originally low-confidence
-    // Never touch word.text - preserve all user edits
-    setWords((prev) =>
-      prev.map((w, i) => {
-        const orig = originalWords[i];
-        const wasLowConf = orig && orig.confidence !== null && orig.confidence < CONFIDENCE_THRESHOLD;
-        return {
-          ...w,
-          committed: wasLowConf ? false : w.committed,
-          flagged: wasLowConf ? false : w.flagged,
-        };
-      })
-    );
-    setAllCommitted(false);
+    setWords((prev) => prev.map((w, i) => {
+      const orig = originalWords[i];
+      const wasLow = orig && orig.confidence !== null && orig.confidence < CONFIDENCE_THRESHOLD;
+      return { ...w, committed: wasLow ? false : w.committed, flagged: false };
+    }));
     setPendingEdits({});
-  };
-
-  // ── Sync contentEditable edits back to words array ──
-  const syncEditsToWords = () => {
-    if (!editTextareaRef.current) return;
-    const liveText = (editTextareaRef.current.value || "").trim();
-    if (!liveText) return;
-    const liveWords = liveText.split(/\s+/).filter(Boolean);
-    setWords((prev) => {
-      const next = prev.map((w, i) => ({
-        ...w,
-        text: liveWords[i] !== undefined ? liveWords[i] : w.text,
-      }));
-      // If edited text has fewer words, trim; if more, append plainly
-      if (liveWords.length > prev.length) {
-        for (let i = prev.length; i < liveWords.length; i++) {
-          next.push({ text: liveWords[i], confidence: null, committed: false, flagged: false });
-        }
-      }
-      return next.slice(0, Math.max(liveWords.length, 1));
-    });
   };
 
   // ── Copy / share ──
   const getFullText = () => {
-    if (editMode && editTextareaRef.current) {
-      return editTextareaRef.current.value.trim();
-    }
-    if (transcriptRef.current) {
-      return transcriptRef.current.innerText.trim();
-    }
+    if (editMode) return editText;
     return words.map((w) => w.text).join(" ");
   };
 
-  const copyText = (setCopiedFn) => {
+  const copyText = (setCopied) => {
     navigator.clipboard.writeText(getFullText());
-    setCopiedFn(true);
-    setTimeout(() => setCopiedFn(false), 2000);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
   };
 
   const downloadTxt = () => {
     const blob = new Blob([getFullText()], { type: "text/plain" });
     const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url; a.download = "transcript.txt"; a.click();
+    const a = document.createElement("a"); a.href = url; a.download = "transcript.txt"; a.click();
     URL.revokeObjectURL(url);
   };
 
@@ -1382,17 +1152,11 @@ export default function App() {
     let cur = "";
     wordArr.forEach((w) => {
       const t = cur ? cur + " " + w : w;
-      if (t.length > maxChars && cur) { lines.push(cur); cur = w; }
-      else cur = t;
+      if (t.length > maxChars && cur) { lines.push(cur); cur = w; } else cur = t;
     });
     if (cur) lines.push(cur);
 
-    const fs = 12;
-    const lead = 18;
-    const mx = 72;
-    const my = 72;
-    const ph = 792;
-    const pw = 612;
+    const fs = 12, lead = 18, mx = 72, my = 72, ph = 792, pw = 612;
     const lpp = Math.floor((ph - my * 2) / lead);
     const pages = [];
     for (let i = 0; i < lines.length; i += lpp) pages.push(lines.slice(i, i + lpp));
@@ -1411,15 +1175,15 @@ export default function App() {
 
     const base = 3;
     const pageNums = [];
-
     pages.forEach((pg, pi) => {
       const sn = base + pi * 2;
       const pn = base + pi * 2 + 1;
       const ty = ph - my;
-      const header = "BT" + "\n" + "/F1 " + fs + " Tf" + "\n" + mx + " " + ty + " Td" + "\n" + lead + " TL" + "\n";
+      const nl = "\n";
+      const header = "BT" + nl + "/F1 " + fs + " Tf" + nl + mx + " " + ty + " Td" + nl + lead + " TL" + nl;
       const body = pg.map((line) => {
         const safe = line.split("").filter((c) => c.charCodeAt(0) < 128 && c !== "(" && c !== ")" && c !== "\\").join("");
-        return "(" + safe + ") Tj T*" + "\n";
+        return "(" + safe + ") Tj T*" + nl;
       }).join("");
       const s = header + body + "ET";
 
@@ -1454,9 +1218,7 @@ export default function App() {
     ln("xref");
     ln("0 " + total);
     ln("0000000000 65535 f ");
-    for (let i = 1; i < total; i++) {
-      ln(String(offsets[i] || 0).padStart(10, "0") + " 00000 n ");
-    }
+    for (let i = 1; i < total; i++) ln(String(offsets[i] || 0).padStart(10, "0") + " 00000 n ");
     ln("trailer");
     ln("<< /Size " + total + " /Root " + cat + " 0 R >>");
     ln("startxref");
@@ -1465,10 +1227,7 @@ export default function App() {
 
     const blob = new Blob([out.join("\n")], { type: "application/pdf" });
     const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = "transcript.pdf";
-    a.click();
+    const a = document.createElement("a"); a.href = url; a.download = "transcript.pdf"; a.click();
     URL.revokeObjectURL(url);
   };
 
@@ -1479,13 +1238,12 @@ export default function App() {
     });
     const blob = await Packer.toBlob(doc);
     const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url; a.download = "transcript.docx"; a.click();
+    const a = document.createElement("a"); a.href = url; a.download = "transcript.docx"; a.click();
     URL.revokeObjectURL(url);
   };
 
   const shareEmail = () => {
-    window.open(`mailto:?subject=${encodeURIComponent("Transcript")}&body=${encodeURIComponent(getFullText())}`);
+    window.open("mailto:?subject=" + encodeURIComponent("Transcript") + "&body=" + encodeURIComponent(getFullText()));
   };
 
   const shareSms = () => {
@@ -1495,45 +1253,43 @@ export default function App() {
       setTimeout(() => setShowSmsWarning(false), 7000);
       return;
     }
-    window.open(`sms:?body=${encodeURIComponent(text)}`);
+    window.open("sms:?body=" + encodeURIComponent(text));
   };
 
+  // ── Reset ──
   const reset = () => {
-    setFile(null); setWords([]); setStatus("idle");
-    setProgress(0); setError(null); setAudioDuration(null);
-    setPendingEdits({}); setEditMode(false); setEditedText(""); setAllCommitted(false); setOriginalWords([]); setShareOpen(false); setShareOpenBottom(false);
+    setFile(null); setWords([]); setOriginalWords([]);
+    setStatus("idle"); setProgress(0); setError(null);
+    setAudioDuration(null); setPendingEdits({});
+    setEditMode(false); setEditText("");
+    setShareOpen(false); setShareOpenBottom(false);
     setShowSmsWarning(false);
     if (fileInputRef.current) fileInputRef.current.value = "";
   };
 
-  const lowConfWords = words.filter(
-    (w) => (w.confidence !== null && w.confidence < CONFIDENCE_THRESHOLD && !w.committed) || w.flagged
+  // ── Derived ──
+  const lowConfWords = words.filter((w) =>
+    ((w.confidence !== null && w.confidence < CONFIDENCE_THRESHOLD) || w.flagged) && !w.committed
   );
   const pendingCount = Object.keys(pendingEdits).length;
-
+  const anyCommitted = words.some((w) => w.committed);
   const avgConf = words.length > 0
     ? Math.round((words.reduce((s, w) => s + (w.confidence ?? 1), 0) / words.length) * 100)
     : null;
 
   const renderTranscript = () => {
-    let out = [];
+    const out = [];
     for (let i = 0; i < words.length; i++) {
       out.push(
-        <Word
-          key={i}
-          word={words[i]}
-          index={i}
-          onEdit={handleWordEdit}
-          onPendingChange={handlePendingChange}
-          onFlag={handleFlag}
-        />
+        <Word key={i} word={words[i]} index={i}
+          onEdit={handleWordEdit} onPendingChange={handlePendingChange} onFlag={handleFlag} />
       );
       if (i < words.length - 1) out.push(" ");
     }
     return out;
   };
 
-  // ── Toolbar component ──
+  // ── Toolbar ──
   const Toolbar = ({ isBottom }) => {
     const open = isBottom ? shareOpenBottom : shareOpen;
     const setOpen = isBottom ? setShareOpenBottom : setShareOpen;
@@ -1541,10 +1297,9 @@ export default function App() {
     const copied = isBottom ? copiedBottom : copiedTop;
 
     return (
-      <div className={`toolbar ${isBottom ? "toolbar-bottom" : ""}`}>
+      <div className={"toolbar" + (isBottom ? " toolbar-bottom" : "")}>
         <button className="tool-btn" onClick={() => copyText(setCopied)}>
-          <span className="tool-icon">⎘</span>
-          {copied ? "Copied!" : "Copy"}
+          <span className="tool-icon">⎘</span>{copied ? "Copied!" : "Copy"}
         </button>
 
         <div className="share-wrapper">
@@ -1575,23 +1330,23 @@ export default function App() {
         {!isBottom && (
           <>
             <button
-              className={`tool-btn ${editMode ? "active" : ""}`}
-              onClick={() => {
-                if (editMode) {
-                  syncEditsToWords();
-                }
-                setEditMode(!editMode);
-              }}
+              className={"tool-btn" + (editMode ? " active" : "")}
+              onClick={editMode ? exitEditMode : enterEditMode}
             >
               <span className="tool-icon">✎</span>
               {editMode ? "Done Editing" : "Edit"}
             </button>
-            {lowConfWords.length > 0 && (
-              <button className="tool-btn commit-btn" onClick={commitAllPending}>
+            {lowConfWords.length > 0 && !editMode && (
+              <button className="tool-btn commit-btn" onClick={commitAll}>
                 <span className="tool-icon">✓</span> Commit All
               </button>
             )}
-            {words.some((w) => w.committed) && (
+            {editMode && (
+              <button className="tool-btn commit-btn" onClick={commitAll}>
+                <span className="tool-icon">✓</span> Commit All
+              </button>
+            )}
+            {anyCommitted && !editMode && (
               <button className="tool-btn" onClick={restoreHighlights}>
                 <span className="tool-icon">◎</span> Restore Highlights
               </button>
@@ -1602,9 +1357,7 @@ export default function App() {
         {isBottom && (
           <>
             <button className="new-btn" onClick={reset}>New Recording</button>
-            <span className={`save-indicator ${saveIndicator ? "visible" : ""}`}>
-              ✓ Saved
-            </span>
+            <span className={"save-indicator" + (saveIndicator ? " visible" : "")}>✓ Saved</span>
           </>
         )}
       </div>
@@ -1612,21 +1365,17 @@ export default function App() {
   };
 
   if (!authChecked) return null;
-
   const showAuth = !user && !authSkipped;
 
   return (
     <>
       <style>{STYLES}</style>
       <div className="app" onClick={(e) => {
-        if (!e.target.closest(".share-wrapper")) {
-          setShareOpen(false);
-          setShareOpenBottom(false);
-        }
+        if (!e.target.closest(".share-wrapper")) { setShareOpen(false); setShareOpenBottom(false); }
       }}>
-        {/* Sessions drawer */}
+        {/* Drawer */}
         {drawerOpen && <div className="drawer-overlay" onClick={() => setDrawerOpen(false)} />}
-        <div className={`sessions-drawer ${drawerOpen ? "open" : ""}`}>
+        <div className={"sessions-drawer" + (drawerOpen ? " open" : "")}>
           <div className="drawer-header">
             <div className="drawer-title">Saved Sessions</div>
             <button className="drawer-close" onClick={() => setDrawerOpen(false)}>✕</button>
@@ -1635,25 +1384,21 @@ export default function App() {
             {sessionsLoading ? (
               <div className="no-sessions">Loading...</div>
             ) : sessions.length === 0 ? (
-              <div className="no-sessions">
-                No saved sessions yet.<br />Transcribe a recording to save it here automatically.
-              </div>
-            ) : (
-              sessions.map((s) => (
-                <div key={s.id} className="session-card" onClick={() => restoreSession(s)}>
-                  <div className="session-card-header">
-                    <div className="session-filename">{s.file_name || "Untitled"}</div>
-                    <button className="session-delete" onClick={(e) => deleteSession(s.id, e)}>✕</button>
-                  </div>
-                  <div className="session-meta">
-                    <span>{formatDate(s.created_at)}</span>
-                    {s.duration_seconds > 0 && <span>{formatDuration(s.duration_seconds * 1000)}</span>}
-                    <span>{s.word_count} words</span>
-                  </div>
-                  <div className="session-preview">{s.transcript}</div>
+              <div className="no-sessions">No saved sessions yet.<br />Transcribe a recording to save it automatically.</div>
+            ) : sessions.map((s) => (
+              <div key={s.id} className="session-card" onClick={() => restoreSession(s)}>
+                <div className="session-card-header">
+                  <div className="session-filename">{s.file_name || "Untitled"}</div>
+                  <button className="session-delete" onClick={(e) => deleteSession(s.id, e)}>✕</button>
                 </div>
-              ))
-            )}
+                <div className="session-meta">
+                  <span>{formatDate(s.created_at)}</span>
+                  {s.duration_seconds > 0 && <span>{formatDuration(s.duration_seconds * 1000)}</span>}
+                  <span>{s.word_count} words</span>
+                </div>
+                <div className="session-preview">{s.transcript}</div>
+              </div>
+            ))}
           </div>
         </div>
 
@@ -1662,9 +1407,7 @@ export default function App() {
           <div className="header-left">
             <div className="header-eyebrow">Transcription Studio</div>
             <h1 className="header-title">Every word, <em>examined.</em></h1>
-            <p className="header-sub">
-              Upload any audio recording. Low-confidence words surface quietly - click to correct them.
-            </p>
+            <p className="header-sub">Upload any audio recording. Low-confidence words surface quietly - click to correct them.</p>
           </div>
           <div className="header-right">
             {user ? (
@@ -1674,7 +1417,7 @@ export default function App() {
                   {user.email.split("@")[0]}
                 </div>
                 <button className="signout-btn" onClick={signOut}>Sign out</button>
-                <button className="hamburger-btn" onClick={openDrawer} title="Saved sessions">
+                <button className="hamburger-btn" onClick={openDrawer}>
                   <span /><span /><span />
                 </button>
               </>
@@ -1689,8 +1432,8 @@ export default function App() {
           <div className="auth-section">
             <div className="auth-title">Sign in to save sessions</div>
             <div className="auth-tabs">
-              <button className={`auth-tab ${authMode === "signin" ? "active" : ""}`} onClick={() => setAuthMode("signin")}>Sign In</button>
-              <button className={`auth-tab ${authMode === "signup" ? "active" : ""}`} onClick={() => setAuthMode("signup")}>Create Account</button>
+              <button className={"auth-tab" + (authMode === "signin" ? " active" : "")} onClick={() => setAuthMode("signin")}>Sign In</button>
+              <button className={"auth-tab" + (authMode === "signup" ? " active" : "")} onClick={() => setAuthMode("signup")}>Create Account</button>
             </div>
             <div className="auth-field">
               <label className="field-label">Email</label>
@@ -1698,11 +1441,13 @@ export default function App() {
             </div>
             <div className="auth-field">
               <label className="field-label">Password</label>
-              <input className="auth-input" type="password" placeholder="••••••••" value={authPassword} onChange={(e) => setAuthPassword(e.target.value)}
+              <input className="auth-input" type="password" placeholder="••••••••" value={authPassword}
+                onChange={(e) => setAuthPassword(e.target.value)}
                 onKeyDown={(e) => { if (e.key === "Enter") authMode === "signin" ? signIn() : signUp(); }} />
             </div>
             {authError && <div className="auth-error">{authError}</div>}
-            <button className="auth-btn" disabled={authLoading || !authEmail || !authPassword} onClick={authMode === "signin" ? signIn : signUp}>
+            <button className="auth-btn" disabled={authLoading || !authEmail || !authPassword}
+              onClick={authMode === "signin" ? signIn : signUp}>
               {authLoading ? "Please wait..." : authMode === "signin" ? "Sign In" : "Create Account"}
             </button>
             <div><button className="auth-skip" onClick={() => setAuthSkipped(true)}>Continue without signing in</button></div>
@@ -1712,7 +1457,7 @@ export default function App() {
         {/* Drop zone */}
         {!file ? (
           <div
-            className={`drop-zone ${dragging ? "dragging" : ""}`}
+            className={"drop-zone" + (dragging ? " dragging" : "")}
             onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); setDragging(true); }}
             onDragLeave={(e) => { e.preventDefault(); e.stopPropagation(); setDragging(false); }}
             onDrop={handleDrop}
@@ -1749,7 +1494,7 @@ export default function App() {
           <div className="progress-section">
             <div className="progress-label"><span>Progress</span><span>{progress}%</span></div>
             <div className="progress-bar-track">
-              <div className="progress-bar-fill" style={{ width: `${progress}%` }} />
+              <div className="progress-bar-fill" style={{ width: progress + "%" }} />
             </div>
             <div className="progress-status">{progressLabel}</div>
           </div>
@@ -1760,36 +1505,21 @@ export default function App() {
         {status === "done" && words.length > 0 && (
           <div className="transcript-section">
             <div className="stats-row">
-              <div className="stat">
-                <div className="stat-value">{words.length}</div>
-                <div className="stat-label">Words</div>
-              </div>
+              <div className="stat"><div className="stat-value">{words.length}</div><div className="stat-label">Words</div></div>
               {audioDuration && (
-                <div className="stat">
-                  <div className="stat-value">{formatDuration(audioDuration * 1000)}</div>
-                  <div className="stat-label">Duration</div>
-                </div>
+                <div className="stat"><div className="stat-value">{formatDuration(audioDuration * 1000)}</div><div className="stat-label">Duration</div></div>
               )}
               {avgConf !== null && (
-                <div className="stat">
-                  <div className="stat-value">{avgConf}%</div>
-                  <div className="stat-label">Avg Confidence</div>
-                </div>
+                <div className="stat"><div className="stat-value">{avgConf}%</div><div className="stat-label">Avg Confidence</div></div>
               )}
-              <div className="stat">
-                <div className="stat-value">{lowConfWords.length}</div>
-                <div className="stat-label">To Review</div>
-              </div>
+              <div className="stat"><div className="stat-value">{lowConfWords.length}</div><div className="stat-label">To Review</div></div>
             </div>
 
             <div className="transcript-header">
               <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
                 <div className="transcript-title">Transcript</div>
-                {lowConfWords.length > 0 && (
-                  <div className="legend-item">
-                    <span className="legend-swatch" />
-                    Under 75% confidence
-                  </div>
+                {lowConfWords.length > 0 && !editMode && (
+                  <div className="legend-item"><span className="legend-swatch" />Under 75% confidence</div>
                 )}
               </div>
             </div>
@@ -1802,34 +1532,31 @@ export default function App() {
               </div>
             )}
 
-            {pendingCount > 0 && (
+            {pendingCount > 0 && !editMode && (
               <div className="pending-bar">
-                <span>{pendingCount} word{pendingCount > 1 ? "s" : ""} edited - press Enter in each field or commit all at once</span>
-                <button className="commit-inline-btn" onClick={commitAllPending}>Commit All</button>
+                <span>{pendingCount} word{pendingCount > 1 ? "s" : ""} edited - press Enter or commit all</span>
+                <button className="commit-inline-btn" onClick={commitAll}>Commit All</button>
               </div>
             )}
 
-            <div className={`transcript-wrapper ${editMode ? "edit-active" : ""}`} ref={transcriptRef}>
-              <div
-                key={allCommitted ? "committed" : "live"}
-                className="transcript-body"
-              >
+            {editMode ? (
+              <textarea
+                ref={textareaRef}
+                className="transcript-body edit-active"
+                value={editText}
+                onChange={(e) => {
+                  setEditText(e.target.value);
+                  e.target.style.height = "auto";
+                  e.target.style.height = e.target.scrollHeight + "px";
+                }}
+                spellCheck={true}
+                autoFocus
+              />
+            ) : (
+              <div ref={transcriptRef} className="transcript-body">
                 {renderTranscript()}
               </div>
-              {editMode && (
-                <textarea
-                  ref={editTextareaRef}
-                  className="transcript-overlay-textarea"
-                  defaultValue={words.map((w) => w.text).join(" ")}
-                  spellCheck={true}
-                  autoFocus
-                  onInput={(e) => {
-                    e.target.style.height = "auto";
-                    e.target.style.height = e.target.scrollHeight + "px";
-                  }}
-                />
-              )}
-            </div>
+            )}
 
             <Toolbar isBottom={true} />
           </div>
