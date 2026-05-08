@@ -728,27 +728,43 @@ const STYLES = `
   .word { display: inline; }
   .word-normal { color: var(--text-primary); cursor: text; }
 
-  .transcript-textarea {
-    width: 100%;
-    background: #131311;
+  .transcript-wrapper {
+    position: relative;
+  }
+
+  .transcript-wrapper.edit-active {
     border: 1px solid var(--border);
     border-radius: 6px;
-    padding: 20px 24px;
+    background: #131311;
+  }
+
+  .transcript-overlay-textarea {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    min-height: 100%;
+    background: transparent;
+    border: none;
+    outline: none;
+    resize: none;
     font-family: var(--font-serif);
     font-size: 19px;
     line-height: 1.85;
-    color: var(--text-primary);
+    color: transparent;
+    caret-color: var(--text-primary);
     letter-spacing: 0.005em;
-    resize: none;
-    outline: none;
-    min-height: 60vh;
-    height: auto;
-    overflow-y: hidden;
-    display: block;
-    transition: border-color 0.2s;
-    box-sizing: border-box;
+    padding: 4px;
+    overflow: hidden;
+    z-index: 2;
+    cursor: text;
   }
-  .transcript-textarea:focus { border-color: var(--accent-dim); }
+
+  .transcript-overlay-textarea::selection {
+    background: rgba(196, 168, 114, 0.3);
+    color: transparent;
+  }
 
   .word-low {
     background: var(--low-confidence-bg);
@@ -1024,6 +1040,7 @@ export default function App() {
 
   const fileInputRef = useRef(null);
   const transcriptRef = useRef(null);
+  const editTextareaRef = useRef(null);
 
   // ── Prevent browser from navigating on accidental drops outside drop zone ──
   useEffect(() => {
@@ -1042,11 +1059,11 @@ export default function App() {
     };
   }, []);
 
-  // ── Auto-size textarea when edit mode opens ──
+  // ── Auto-size overlay textarea when edit mode opens ──
   useEffect(() => {
-    if (editMode && transcriptRef.current) {
-      transcriptRef.current.style.height = "auto";
-      transcriptRef.current.style.height = transcriptRef.current.scrollHeight + "px";
+    if (editMode && editTextareaRef.current) {
+      editTextareaRef.current.style.height = "auto";
+      editTextareaRef.current.style.height = editTextareaRef.current.scrollHeight + "px";
     }
   }, [editMode]);
 
@@ -1265,8 +1282,8 @@ export default function App() {
 
   const commitAllPending = () => {
     // Sync any live DOM edits first before committing
-    if (editMode && transcriptRef.current) {
-      const liveText = (transcriptRef.current.value || transcriptRef.current.innerText || "").trim();
+    if (editMode && editTextareaRef.current) {
+      const liveText = (editTextareaRef.current.value || "").trim();
       const liveWords = liveText.split(/\s+/).filter(Boolean);
       setWords((prev) => {
         const synced = prev.map((w, i) => ({
@@ -1313,8 +1330,8 @@ export default function App() {
 
   // ── Sync contentEditable edits back to words array ──
   const syncEditsToWords = () => {
-    if (!transcriptRef.current) return;
-    const liveText = (transcriptRef.current.value || transcriptRef.current.innerText || "").trim();
+    if (!editTextareaRef.current) return;
+    const liveText = (editTextareaRef.current.value || "").trim();
     if (!liveText) return;
     const liveWords = liveText.split(/\s+/).filter(Boolean);
     setWords((prev) => {
@@ -1334,8 +1351,11 @@ export default function App() {
 
   // ── Copy / share ──
   const getFullText = () => {
+    if (editMode && editTextareaRef.current) {
+      return editTextareaRef.current.value.trim();
+    }
     if (transcriptRef.current) {
-      return (transcriptRef.current.value || transcriptRef.current.innerText || "").trim();
+      return transcriptRef.current.innerText.trim();
     }
     return words.map((w) => w.text).join(" ");
   };
@@ -1789,30 +1809,27 @@ export default function App() {
               </div>
             )}
 
-            {editMode ? (
-              <textarea
-                ref={transcriptRef}
-                className="transcript-body transcript-textarea"
-                defaultValue={words.map((w) => w.text).join(" ")}
-                spellCheck={true}
-                autoFocus
-                onInput={(e) => {
-                  e.target.style.height = "auto";
-                  e.target.style.height = e.target.scrollHeight + "px";
-                }}
-                onLoad={(e) => {
-                  e.target.style.height = e.target.scrollHeight + "px";
-                }}
-              />
-            ) : (
+            <div className={`transcript-wrapper ${editMode ? "edit-active" : ""}`} ref={transcriptRef}>
               <div
                 key={allCommitted ? "committed" : "live"}
-                ref={transcriptRef}
                 className="transcript-body"
               >
                 {renderTranscript()}
               </div>
-            )}
+              {editMode && (
+                <textarea
+                  ref={editTextareaRef}
+                  className="transcript-overlay-textarea"
+                  defaultValue={words.map((w) => w.text).join(" ")}
+                  spellCheck={true}
+                  autoFocus
+                  onInput={(e) => {
+                    e.target.style.height = "auto";
+                    e.target.style.height = e.target.scrollHeight + "px";
+                  }}
+                />
+              )}
+            </div>
 
             <Toolbar isBottom={true} />
           </div>
