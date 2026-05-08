@@ -741,6 +741,7 @@ const STYLES = `
 
   .word-low:hover { background: #322e28; }
   .word-low.pending { background: #2a3828; border-bottom-color: #6a9a6a; color: #b0d890; }
+  .word-low.flagged { background: #2e2b24; border-bottom-color: #c4a872; color: #f0c070; }
 
   .word-input {
     background: #1e2a1e;
@@ -880,12 +881,12 @@ function formatDate(iso) {
 }
 
 // ── Word component - clean input-based editing, no contentEditable ──
-function Word({ word, index, onEdit, onPendingChange }) {
+function Word({ word, index, onEdit, onPendingChange, onFlag }) {
   const [editing, setEditing] = useState(false);
   const [hovered, setHovered] = useState(false);
   const [val, setVal] = useState(word.text);
   const inputRef = useRef(null);
-  const isLow = word.confidence !== null && word.confidence < CONFIDENCE_THRESHOLD && !word.committed;
+  const isLow = (word.confidence !== null && word.confidence < CONFIDENCE_THRESHOLD && !word.committed) || word.flagged;
 
   useEffect(() => { setVal(word.text); }, [word.text]);
 
@@ -906,20 +907,26 @@ function Word({ word, index, onEdit, onPendingChange }) {
     if (e.key === "Escape") { setVal(word.text); finishEdit(false); }
   };
 
-  if (word.committed) {
-    return <span className="word word-normal">{word.text}</span>;
+  const handleContextMenu = (e) => {
+    e.preventDefault();
+    onFlag(index);
+  };
+
+  if (word.committed && !word.flagged) {
+    return <span className="word word-normal" onContextMenu={handleContextMenu}>{word.text}</span>;
   }
 
   if (isLow) {
     return (
       <span
-        className={`word word-low ${editing ? "pending" : ""}`}
+        className={`word word-low ${editing ? "pending" : ""} ${word.flagged ? "flagged" : ""}`}
         onMouseEnter={() => setHovered(true)}
         onMouseLeave={() => setHovered(false)}
+        onContextMenu={handleContextMenu}
       >
         {hovered && !editing && (
           <span className="confidence-tip">
-            {Math.round(word.confidence * 100)}% — click to edit
+            {word.flagged ? "Manually flagged — click to edit, right-click to unflag" : Math.round(word.confidence * 100) + "% — click to edit"}
           </span>
         )}
         {editing ? (
@@ -953,7 +960,7 @@ function Word({ word, index, onEdit, onPendingChange }) {
     );
   }
 
-  return <span className="word word-normal">{word.text}</span>;
+  return <span className="word word-normal" onContextMenu={handleContextMenu}>{word.text}</span>;
 }
 
 // ── Main App ──
@@ -984,6 +991,7 @@ export default function App() {
 
   const [editMode, setEditMode] = useState(false);
   const [allCommitted, setAllCommitted] = useState(false);
+  const [originalWords, setOriginalWords] = useState([]);
   const [editedText, setEditedText] = useState("");
   const [pendingEdits, setPendingEdits] = useState({});
   const [saveIndicator, setSaveIndicator] = useState(false);
@@ -1076,11 +1084,14 @@ export default function App() {
   };
 
   const restoreSession = (session) => {
-    setWords(session.words);
+    const wordList = session.words.map((w) => ({ ...w, committed: false, flagged: false }));
+    setWords(wordList);
+    setOriginalWords(wordList.map((w) => ({ ...w })));
     setAudioDuration(session.duration_seconds);
     setStatus("done");
     setDrawerOpen(false);
     setPendingEdits({});
+    setAllCommitted(false);
     setFile({ name: session.file_name, size: 0, restored: true });
   };
 
@@ -1168,6 +1179,7 @@ export default function App() {
             committed: false,
           }));
           setWords(wordList);
+          setOriginalWords(wordList.map((w) => ({ ...w })));
           setAudioDuration(data.audio_duration);
           setStatus("done");
           await saveSession(wordList, data.audio_duration, file.name);
@@ -1205,6 +1217,16 @@ export default function App() {
     });
   };
 
+  const handleFlag = (index) => {
+    setWords((prev) => {
+      const next = [...prev];
+      const w = next[index];
+      // Toggle flag - if already flagged remove it, if not flagged add it
+      next[index] = { ...w, flagged: !w.flagged, committed: w.flagged ? w.committed : false };
+      return next;
+    });
+  };
+
   const commitAllPending = () => {
     setWords((prev) =>
       prev.map((w) =>
@@ -1218,14 +1240,17 @@ export default function App() {
   };
 
   const restoreHighlights = () => {
+    // Restore original confidence/committed state but keep any text edits the user made
     setWords((prev) =>
-      prev.map((w) =>
-        w.confidence !== null && w.confidence < CONFIDENCE_THRESHOLD
-          ? { ...w, committed: false }
-          : w
-      )
+      prev.map((w, i) => ({
+        ...w,
+        committed: false,
+        flagged: false,
+        confidence: originalWords[i] ? originalWords[i].confidence : w.confidence,
+      }))
     );
     setAllCommitted(false);
+    setPendingEdits({});
   };
 
   // ── Copy / share ──
@@ -1383,13 +1408,13 @@ export default function App() {
   const reset = () => {
     setFile(null); setWords([]); setStatus("idle");
     setProgress(0); setError(null); setAudioDuration(null);
-    setPendingEdits({}); setEditMode(false); setEditedText(""); setAllCommitted(false); setShareOpen(false); setShareOpenBottom(false);
+    setPendingEdits({}); setEditMode(false); setEditedText(""); setAllCommitted(false); setOriginalWords([]); setShareOpen(false); setShareOpenBottom(false);
     setShowSmsWarning(false);
     if (fileInputRef.current) fileInputRef.current.value = "";
   };
 
   const lowConfWords = words.filter(
-    (w) => w.confidence !== null && w.confidence < CONFIDENCE_THRESHOLD && !w.committed
+    (w) => (w.confidence !== null && w.confidence < CONFIDENCE_THRESHOLD && !w.committed) || w.flagged
   );
   const pendingCount = Object.keys(pendingEdits).length;
 
@@ -1407,6 +1432,7 @@ export default function App() {
           index={i}
           onEdit={handleWordEdit}
           onPendingChange={handlePendingChange}
+          onFlag={handleFlag}
         />
       );
       if (i < words.length - 1) out.push(" ");
@@ -1465,12 +1491,12 @@ export default function App() {
               <span className="tool-icon">✎</span>
               {editMode ? "Done Editing" : "Edit"}
             </button>
-            {!allCommitted && lowConfWords.length > 0 && (
+            {lowConfWords.length > 0 && (
               <button className="tool-btn commit-btn" onClick={commitAllPending}>
                 <span className="tool-icon">✓</span> Commit All
               </button>
             )}
-            {allCommitted && (
+            {words.some((w) => w.committed) && (
               <button className="tool-btn" onClick={restoreHighlights}>
                 <span className="tool-icon">◎</span> Restore Highlights
               </button>
@@ -1689,6 +1715,7 @@ export default function App() {
             )}
 
             <div
+              key={allCommitted ? "committed" : "live"}
               ref={transcriptRef}
               className={`transcript-body ${editMode ? "edit-active" : ""}`}
               contentEditable={editMode}
