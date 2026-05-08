@@ -1023,12 +1023,18 @@ export default function App() {
 
   // ── Prevent browser from navigating on accidental drops outside drop zone ──
   useEffect(() => {
-    const prevent = (e) => { e.preventDefault(); e.stopPropagation(); };
-    document.addEventListener("dragover", prevent);
-    document.addEventListener("drop", prevent);
+    const preventNav = (e) => { e.preventDefault(); };
+    const blockOutsideDrop = (e) => {
+      if (!e.target.closest(".drop-zone")) {
+        e.preventDefault();
+        e.stopPropagation();
+      }
+    };
+    document.addEventListener("dragover", preventNav);
+    document.addEventListener("drop", blockOutsideDrop);
     return () => {
-      document.removeEventListener("dragover", prevent);
-      document.removeEventListener("drop", prevent);
+      document.removeEventListener("dragover", preventNav);
+      document.removeEventListener("drop", blockOutsideDrop);
     };
   }, []);
 
