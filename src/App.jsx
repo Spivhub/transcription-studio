@@ -627,9 +627,19 @@ const STYLES = `
     color: var(--text-primary);
     letter-spacing: 0.005em;
     outline: none;
-    min-height: 40px;
+    min-height: 120px;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+    overflow-wrap: break-word;
   }
-  .tiptap-wrapper .ProseMirror p { margin: 0; }
+  .tiptap-wrapper .ProseMirror p {
+    margin: 0;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+  }
+  .tiptap-wrapper.edit-active .ProseMirror {
+    min-height: 200px;
+  }
   .tiptap-wrapper .ProseMirror mark[data-low] {
     background: var(--low-bg);
     color: var(--low-text);
@@ -740,13 +750,36 @@ export default function App() {
   // ── TipTap editor ──
   const editor = useEditor({
     extensions: [
-      StarterKit.configure({ bold: false, italic: false, heading: false, blockquote: false, codeBlock: false, horizontalRule: false, bulletList: false, orderedList: false, listItem: false, code: false, strike: false }),
+      StarterKit.configure({
+        bold: false,
+        italic: false,
+        heading: false,
+        blockquote: false,
+        codeBlock: false,
+        horizontalRule: false,
+        bulletList: false,
+        orderedList: false,
+        listItem: false,
+        code: false,
+        strike: false,
+        paragraph: {
+          HTMLAttributes: { style: "margin:0; white-space: pre-wrap; word-wrap: break-word;" },
+        },
+      }),
       LowConfidence,
     ],
     content: "",
     editable: false,
     editorProps: {
       attributes: { spellcheck: "true" },
+      handleKeyDown(view, event) {
+        // Prevent Enter from creating new paragraphs - keep everything flat
+        if (event.key === "Enter") {
+          event.preventDefault();
+          return true;
+        }
+        return false;
+      },
       handleClick(view, pos, event) {
         // In read mode, clicking a mark does quick-commit
         if (editMode) return false;
